@@ -1,0 +1,17 @@
+Pretty Good IRC Daemon
+======================
+
+This is a feature-stripped IRC daemon similar to the now-defunct iacd.
+It provides an additional set of commands to allow clients to intercept
+all channel activity.  This allows a whole new range of possibilites for
+bots: including something as simple as rot13-encoding all channel
+discussions, to something as complex as a full MUD or MOO.
+
+
+Downloading
+-----------
+
+If you can read this, I forgot to update the README!  Please mail
+neale@woozle.org and I'll publish a URL for a download.
+
+
