@@ -1,0 +1,22 @@
+USE_OCAMLFIND = true
+OCAMLPACKS[] = 
+    equeue
+    pcre
+
+.DEFAULT: ircd
+
+OCamlProgram(pgircd, pgircd ircd connection)
+
+section
+    OCAMLPACKS[] +=
+        oUnit
+
+    tests.cmx:
+    tests.cmi:
+    tests$(EXT_OBJ):
+
+    OCamlProgram(tests, tests chat ircd connection)
+
+.PHONY: clean
+clean:
+	rm $(filter-out %.pem tls.c, $(filter-proper-targets $(ls R, .)))
