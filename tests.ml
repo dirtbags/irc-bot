@@ -3,21 +3,20 @@ open OUnit
 open Chat
 
 let do_chat script () =
-  let irc_instance ues fd =
-    let irc = new Irc.irc ues in
-      irc#set_fd fd "nick" "gecos";
+  let ircd_instance ues fd =
+    let irc = new Ircd.ircd_connection ues fd in
       irc#debug true
   in
-    chat script irc_instance
+    chat script ircd_instance
 
 let normal_tests =
   let login_script =
     [
-      Recv "USER nick +iw nick :gecos\n";
-      Recv "NICK nick\n";
-      Send ":testserver.test NOTICE nick :*** Hi there.\n";
-      Send "PING :12345\n";
-      Recv "PONG :12345\n";
+      Send "USER nick +iw nick :gecos\n";
+      Send "NICK nick\n";
+      Recv ":testserver.test NOTICE nick :*** Hi there.\n";
+      Recv "PING :12345\n";
+      Send "PONG :12345\n";
     ]
   in
     "Normal tests" >:::
@@ -28,8 +27,7 @@ let normal_tests =
 
 	"Full connection" >::
 	  (do_chat
-	     ([Send ":testserver.test NOTICE AUTH :*** Doing some pointless ident junk...\n"] @
-		login_script @
+	     (login_script @
 		[
 		  Send ":testserver.test 001 nick :Welcome to the test script\n";
 		  Send ":testserver.test 002 nick :Your host is testserver.test\n";

@@ -5,7 +5,7 @@ type chat_event =
   | Recv of string
 
 exception Chat_match of (chat_event * chat_event)
-exception Chat_failure of string
+exception Chat_timeout of chat_event
 
 let string_of_chat_event e =
   match e with
@@ -14,7 +14,7 @@ let string_of_chat_event e =
     | Recv str ->
 	("Recv(\"" ^ (String.escaped str) ^ "\")")
 
-	  (** Return true if str starts with substr *)
+(** Return true if str starts with substr *)
 let startswith str substr =
   let l = String.length substr in
     if l > String.length str then
@@ -39,83 +39,58 @@ let read_fd fd =
 
 class chat_handler chatscript (ues : unix_event_system) fd =
 object (self)
+  inherit Connection.connection ues fd
+
   val mutable script = chatscript
-  val g = ues#new_group ()
+  val inbuf = Buffer.create 4096
 
   initializer
-    ues#add_handler g self#handler;
-    self#setup ()
+    self#run_script ();
+    self#pulse (Send "") ()
 
-  method setup () =
+
+  method pulse hd () =
+    if (List.hd script = hd) then
+      raise (Chat_timeout hd)
+    else
+      ues#once g 2.0 (self#pulse (List.hd script))
+
+
+  method run_script () =
     match script with
       | [] ->
 	  Unix.close fd;
 	  ues#clear g
-      | Send _ :: _ ->
-	  ues#add_resource g (Wait_out fd, -.1.0);
-	  begin
-	    try
-	      ues#remove_resource g (Wait_in fd)
-	    with Not_found ->
-	      ()
-	  end
-      | Recv _ :: _ ->
-	  ues#add_resource g (Wait_in fd, -.1.0);
-	  begin
-	    try
-	      ues#remove_resource g (Wait_out fd)
-	    with Not_found ->
-	      ()
-	  end
-
-
-  method handler ues' (esys : event Equeue.t) e =
-    assert (ues = ues');
-    match e with
-      | Input_arrived (g, fd) ->
-	  self#handle_input fd
-      | Output_readiness (g, fd) ->
-	  self#handle_output fd
-      | _ ->
-	  raise Equeue.Reject
-
-  method handle_input fd =
-    let buf = read_fd fd in
-      match script with
-	| Recv str :: tl ->
-	    if (buf = str) then
-	      begin
-		script <- tl;
-		self#setup()
-	      end
-	    else if startswith buf str then
-	      begin
-		script <- [Recv (string_after buf (String.length str))] @ tl;
-		self#setup()
-	      end
+      | Send buf :: tl ->
+	  self#write buf;
+	  script <- tl;
+	  self#run_script ()
+      | Recv buf :: tl ->
+	  let buf_len = String.length buf in
+	  let inbuf_str = Buffer.contents inbuf in
+	    if (Buffer.length inbuf >= buf_len) then
+	      if startswith inbuf_str buf then
+		begin
+		  script <- tl;
+		  Buffer.clear inbuf;
+		  Buffer.add_substring
+		    inbuf
+		    inbuf_str
+		    buf_len
+		    ((String.length inbuf_str) - buf_len);
+		  self#run_script ()
+		end
+	      else
+		raise (Chat_match (Recv inbuf_str,
+				   Recv buf))
 	    else
-	      raise (Chat_match ((Recv str), (Recv buf)))
-	| x :: tl ->
-	    raise (Chat_match (x, (Recv buf)))
-	| [] ->
-	    raise (Chat_match ((Recv ""), (Recv buf)))
+	      ()
 
 
-  method handle_output fd =
-    match script with
-      | Send str :: tl ->
-	  let slen = String.length str in
-	  let n = Unix.single_write fd str 0 slen in
-	    if (n <> slen) then
-	      script <- [Send (string_after str n)] @ tl
-	    else
-	      script <- tl;
-	    self#setup()
-      | x :: tl ->
-	  raise (Chat_match (x, (Send "")))
-      | [] ->
-	  raise (Chat_match ((Recv ""), (Send "")))
-  
+  method handle_input data =
+    Buffer.add_string inbuf data;
+    self#run_script ()
+
 end
 
 
@@ -133,9 +108,13 @@ let chat script proc =
   let _ = new chat_handler script ues b in
     try
       Unixqueue.run ues
-    with Chat_match (got, expected) ->
-      raise (Chat_failure ("Chat_match; got " ^
-			     (string_of_chat_event got) ^
-			     ", expected " ^
-			     (string_of_chat_event expected)))
+    with
+      | Chat_match (got, expected) ->
+	  raise (Failure ("Chat_match; got " ^
+			    (string_of_chat_event got) ^
+			    ", expected " ^
+			    (string_of_chat_event expected)))
+      | Chat_timeout evt ->
+	  raise (Failure ("Chat_timeout waiting for " ^
+			    (string_of_chat_event evt)))
 

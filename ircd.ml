@@ -2,7 +2,18 @@ open Unixqueue
 
 class ircd_connection (ues : unix_event_system) fd =
 object (self)
-  inherit Connection.connection ues fd
+  inherit Connection.line_connection ues fd
+
+  method handle_line line =
+    let parts = Pcre.split ~pat:" " line in
+      match parts with
+	| ["NICK"; nick] ->
+	    self#log ("Set nickname to " ^ nick);
+	    self#write ":testserver.test NOTICE nick :*** Hi there.\n";
+	    self#write "PING :12345\n";
+	| _ ->
+	    self#log ("Unknown: " ^ line)
+      
 end
 
 
@@ -18,7 +29,4 @@ let main () =
       handle_connection
       (Unix.ADDR_INET (Unix.inet_addr_any, 7777));
     ues#run ()
-
-let _ =
-  main ()
 
