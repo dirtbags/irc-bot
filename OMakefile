@@ -3,7 +3,7 @@ OCAMLPACKS[] =
     equeue
     pcre
 
-.DEFAULT: ircd
+.DEFAULT: pgircd
 
 OCamlProgram(pgircd, pgircd ircd connection)
 
@@ -19,4 +19,4 @@ section
 
 .PHONY: clean
 clean:
-	rm $(filter-out %.pem tls.c, $(filter-proper-targets $(ls R, .)))
+	rm $(filter-proper-targets $(ls R, .))

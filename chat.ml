@@ -39,22 +39,16 @@ let read_fd fd =
 
 class chat_handler chatscript (ues : unix_event_system) fd =
 object (self)
-  inherit Connection.connection ues fd
+  inherit Connection.bare_connection ~input_timeout:0.1 ~output_timeout:0.1 ues fd
 
   val mutable script = chatscript
   val inbuf = Buffer.create 4096
 
   initializer
     self#run_script ();
-    self#pulse (Send "") ()
 
-
-  method pulse hd () =
-    if (List.hd script = hd) then
-      raise (Chat_timeout hd)
-    else
-      ues#once g 2.0 (self#pulse (List.hd script))
-
+  method handle_timeout op =
+    raise (Chat_timeout (List.hd script))
 
   method run_script () =
     match script with
@@ -110,11 +104,11 @@ let chat script proc =
       Unixqueue.run ues
     with
       | Chat_match (got, expected) ->
-	  raise (Failure ("Chat_match; got " ^
+	  raise (Failure ("Not matched: got " ^
 			    (string_of_chat_event got) ^
 			    ", expected " ^
 			    (string_of_chat_event expected)))
       | Chat_timeout evt ->
-	  raise (Failure ("Chat_timeout waiting for " ^
+	  raise (Failure ("Timeout waiting for " ^
 			    (string_of_chat_event evt)))
 
