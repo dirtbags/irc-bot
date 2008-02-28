@@ -2,10 +2,11 @@ USE_OCAMLFIND = true
 OCAMLPACKS[] = 
     equeue
     pcre
+    str
 
-.DEFAULT: pgircd
+.DEFAULT: ircd
 
-OCamlProgram(pgircd, pgircd ircd connection)
+OCamlProgram(ircd, ircd irc client server)
 
 section
     OCAMLPACKS[] +=
@@ -15,7 +16,7 @@ section
     tests.cmi:
     tests$(EXT_OBJ):
 
-    OCamlProgram(tests, tests chat ircd connection)
+    OCamlProgram(tests, tests chat ircd irc client server)
 
 .PHONY: clean
 clean:

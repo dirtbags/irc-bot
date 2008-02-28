@@ -1,5 +1,7 @@
 open Unixqueue
 
+exception Buffer_overrun
+
 type chat_event =
   | Send of string
   | Recv of string
@@ -37,18 +39,73 @@ let read_fd fd =
     String.sub buf 0 len
     
 
-class chat_handler chatscript (ues : unix_event_system) fd =
+class chat_handler chatscript 
+  ?(input_timeout=0.1)
+  ?(output_timeout = 0.1)
+  ?(output_max = 4096)
+  ?(input_max = 4096)
+  (ues : unix_event_system) fd =
 object (self)
-  inherit Connection.bare_connection ~input_timeout:0.1 ~output_timeout:0.1 ues fd
+  val g = ues#new_group ()
+  val mutable debug = false
+
+
+  val obuf = String.create output_max
+  val mutable obuf_len = 0
 
   val mutable script = chatscript
   val inbuf = Buffer.create 4096
 
   initializer
+    ues#add_handler g self#handle_event;
+    ues#add_resource g (Wait_in fd, input_timeout);
     self#run_script ();
 
-  method handle_timeout op =
-    raise (Chat_timeout (List.hd script))
+  method write data =
+    let data_len = String.length data in
+      if (data_len + obuf_len > output_max) then
+	raise Buffer_overrun;
+      String.blit data 0 obuf obuf_len data_len;
+      obuf_len <- obuf_len + data_len;
+      ues#add_resource g (Wait_out fd, output_timeout)
+
+  method handle_event ues esys e =
+    match e with
+      | Input_arrived (g, fd) ->
+	  let data = String.create input_max in
+	  let len = Unix.read fd data 0 input_max in
+	    if (len > 0) then
+	      begin
+		Buffer.add_string inbuf (String.sub data 0 len);
+		self#run_script ()
+	      end
+	    else
+	      begin
+		Unix.close fd;
+		ues#clear g;
+	      end
+      | Output_readiness (g, fd) ->
+	  let size = obuf_len in
+	  let n = Unix.single_write fd obuf 0 size in
+	    obuf_len <- obuf_len - n;
+	    if (obuf_len = 0) then
+	      (* Don't check for output readiness anymore *)
+	      begin
+		ues#remove_resource g (Wait_out fd)
+	      end
+	    else
+	      (* Put unwritten output back into the output queue *)
+	      begin
+		String.blit obuf n obuf 0 (obuf_len)
+	      end
+      | Out_of_band (g, fd) ->
+	  raise (Failure "Out of band data")
+      | Timeout (g, op) ->
+	  raise (Chat_timeout (List.hd script))
+      | Signal ->
+	  raise (Failure "Signal")
+      | Extra exn ->
+	  raise (Failure "Extra")
 
   method run_script () =
     match script with
@@ -79,11 +136,6 @@ object (self)
 				   Recv buf))
 	    else
 	      ()
-
-
-  method handle_input data =
-    Buffer.add_string inbuf data;
-    self#run_script ()
 
 end
 

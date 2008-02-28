@@ -1,15 +1,51 @@
 open Unixqueue
 open OUnit
 open Chat
+open Irc
 
 let do_chat script () =
   let ircd_instance ues fd =
-    let irc = new Ircd.ircd_connection ues fd in
-      irc#debug true
+    let srv = Server.create () in
+    let handle_event = Client.create_event_handler srv in
+    let g = Unixqueue.new_group ues in
+    let cli = Client.create ues g fd in
+      Hashtbl.replace srv.Irc.clients_by_file_descr fd cli;
+      Unixqueue.add_handler ues g handle_event;
+      Unixqueue.add_resource ues g (Unixqueue.Wait_in fd, -.1.0)
   in
     chat script ircd_instance
 
-let normal_tests =
+let unit_tests =
+  "Unit tests" >:::
+    [
+      "command_of_string" >:: 
+	(fun () ->
+	   assert_equal
+	     ~printer:string_of_command
+	     {sender = None;
+	      command = "NICK";
+	      args = ["name"];
+	      text = None}
+	     (command_of_string "NICK name");
+	   assert_equal
+	     ~printer:string_of_command
+	     {sender = Some "foo";
+	      command = "NICK";
+	      args = ["name"];
+	      text = None}
+	     (command_of_string ":foo NICK name");
+	   assert_equal
+	     ~printer:string_of_command
+	     {sender = Some "foo.bar";
+	      command = "PART";
+	      args = ["#foo"; "#bar"];
+	      text = Some "ta ta"}
+	     (command_of_string ":foo.bar PART #foo #bar :ta ta");
+	)
+    ]
+      
+
+let regression_tests =
   let login_script =
     [
       Send "USER nick +iw nick :gecos\n";
@@ -19,7 +55,7 @@ let normal_tests =
       Send "PONG :12345\n";
     ]
   in
-    "Normal tests" >:::
+    "Regression tests" >:::
       [
 	"Simple connection" >::
 	  (do_chat
@@ -50,6 +86,6 @@ let normal_tests =
       ]
 
 let _ =
-  run_test_tt_main (TestList [normal_tests])
+  run_test_tt_main (TestList [unit_tests; regression_tests])
 	
   
