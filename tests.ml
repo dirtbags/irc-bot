@@ -5,12 +5,9 @@ open Irc
 
 let do_chat script () =
   let ircd_instance ues fd =
-    let srv = Server.create () in
-    let handle_event = Client.create_event_handler srv in
     let g = Unixqueue.new_group ues in
-    let cli = Client.create ues g fd in
-      Hashtbl.replace srv.Irc.clients_by_file_descr fd cli;
-      Unixqueue.add_handler ues g handle_event;
+      ignore (Client.create ues g fd);
+      Unixqueue.add_handler ues g Client.handle_event;
       Unixqueue.add_resource ues g (Unixqueue.Wait_in fd, -.1.0)
   in
     chat script ircd_instance
@@ -21,26 +18,20 @@ let unit_tests =
       "command_of_string" >:: 
 	(fun () ->
 	   assert_equal
-	     ~printer:string_of_command
-	     {sender = None;
-	      command = "NICK";
-	      args = ["name"];
-	      text = None}
-	     (command_of_string "NICK name");
+	     ~printer:Command.as_string
+	     (Command.create "NICK" ["name"])
+	     (Command.from_string "NICK name");
 	   assert_equal
-	     ~printer:string_of_command
-	     {sender = Some "foo";
-	      command = "NICK";
-	      args = ["name"];
-	      text = None}
-	     (command_of_string ":foo NICK name");
+	     ~printer:Command.as_string
+	     (Command.create ~sender:(Some "foo") "NICK" ["name"])
+	     (Command.from_string ":foo NICK name");
 	   assert_equal
-	     ~printer:string_of_command
-	     {sender = Some "foo.bar";
-	      command = "PART";
-	      args = ["#foo"; "#bar"];
-	      text = Some "ta ta"}
-	     (command_of_string ":foo.bar PART #foo #bar :ta ta");
+	     ~printer:Command.as_string
+	     (Command.create 
+		~sender:(Some "foo.bar") 
+		~text:(Some "ta ta") 
+		"PART" ["#foo"; "#bar"])
+	     (Command.from_string ":foo.bar PART #foo #bar :ta ta");
 	)
     ]
       

@@ -25,16 +25,13 @@ let establish_server ues connection_handler addr =
     Unixqueue.add_resource ues g (Unixqueue.Wait_in srv, -.1.0)
 
 let main () =
-  let srv = Server.create () in
-  let handle_event = Client.create_event_handler srv in
   let ues = Unixqueue.create_unix_event_system () in
   let g = Unixqueue.new_group ues in
   let handle_connection fd =
-    let cli = Client.create ues g fd in
-      Hashtbl.replace srv.Irc.clients_by_file_descr fd cli;
-      Unixqueue.add_resource ues g (Unixqueue.Wait_in fd, -.1.0);
+    ignore (Client.create ues g fd);
+    Unixqueue.add_resource ues g (Unixqueue.Wait_in fd, -.1.0)
   in
-    Unixqueue.add_handler ues g handle_event;
+    Unixqueue.add_handler ues g Client.handle_event;
     establish_server
       ues
       handle_connection

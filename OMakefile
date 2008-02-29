@@ -6,7 +6,7 @@ OCAMLPACKS[] =
 
 .DEFAULT: ircd
 
-OCamlProgram(ircd, ircd irc client server)
+OCamlProgram(ircd, ircd irc command client channel)
 
 section
     OCAMLPACKS[] +=
@@ -16,7 +16,7 @@ section
     tests.cmi:
     tests$(EXT_OBJ):
 
-    OCamlProgram(tests, tests chat ircd irc client server)
+    OCamlProgram(tests, tests chat ircd irc command client channel)
 
 .PHONY: clean
 clean:
