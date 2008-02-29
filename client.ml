@@ -40,7 +40,7 @@ let close cli ues g fd =
 let write cli cmd =
   let was_empty = Queue.is_empty cli.outq in
     Queue.add cmd cli.outq;
-    if was_empty then
+    if (was_empty && (!(cli.unsent) = ""))  then
       cli.output_ready ()
 
 let handle_close cli =
@@ -51,24 +51,40 @@ let handle_command cli command =
 
 let handle_command_login cli cmd =
   (* Handle a command during the login phase *)
-  match (Command.as_tuple cmd) with
-    | (None, "USER", [username], Some realname) ->
-        cli.username := username;
-        cli.realname := Irc.truncate realname 40
-    | (None, "NICK", [nick], None) ->
-        cli.nick := nick
-    | _ ->
-        write cli (Command.create 
-                     ~sender:(Some !Irc.name)
-                     ~text:(Some "Register first.")
-                     "451" ["*"])
+  (match (Command.as_tuple cmd) with
+     | (None, "USER", [username; _; _], Some realname) ->
+         cli.username := username;
+         cli.realname := Irc.truncate realname 40
+     | (None, "NICK", [nick], None) ->
+         cli.nick := nick;
+     | _ ->
+         write cli (Command.create 
+                      ~sender:(Some !Irc.name)
+                      ~text:(Some "Register first.")
+                      "451" ["*"]));
+  (match (!(cli.username), !(cli.nick)) with
+     | ("", _)
+     | (_, "") ->
+	 ()
+     | (_, nick) ->
+	 write cli (Command.create
+		      ~sender:(Some !Irc.name)
+		      ~text:(Some "*** Hi there.")
+		      "NOTICE"
+		      [nick]))
 
 let rec handle_input cli =
     match cli.ibuf with
       | "" ->
           ()
       | ibuf ->
-          let p = String.index ibuf '\n' in
+          let p = 
+	    let nlp = String.index ibuf '\n' in
+	      if ((String.get ibuf (nlp - 1)) = '\r') then
+		(nlp - 1)
+	      else
+		nlp
+	  in
           let s = String.sub ibuf 0 p in
             if p >= !(cli.ibuf_len) then
               raise Not_found;
@@ -102,12 +118,16 @@ let handle_event ues esys e =
         let buf =
           if (!(cli.unsent) = "") then
             let cmd = Queue.pop cli.outq in
-              Command.as_string cmd
+              (Command.as_string cmd) ^ "\r\n"
           else
             !(cli.unsent)
         in
-        let n = Unix.single_write fd buf 0 (String.length buf) in
-          cli.unsent := Str.string_after buf n
+	let buflen = String.length buf in
+        let n = Unix.single_write fd buf 0 buflen in
+	  if n < buflen then
+            cli.unsent := Str.string_after buf n
+	  else if Queue.is_empty cli.outq then
+	    Unixqueue.remove_resource ues g (Unixqueue.Wait_out fd)
     | Unixqueue.Out_of_band (g, fd) ->
         print_endline "oob"
     | Unixqueue.Timeout (g, op) ->
