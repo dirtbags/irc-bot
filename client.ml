@@ -73,26 +73,23 @@ let handle_command_login cli cmd =
 		      "NOTICE"
 		      [nick]))
 
-let rec handle_input cli =
-    match cli.ibuf with
-      | "" ->
-          ()
-      | ibuf ->
-          let p = 
-	    let nlp = String.index ibuf '\n' in
-	      if ((String.get ibuf (nlp - 1)) = '\r') then
-		(nlp - 1)
-	      else
-		nlp
-	  in
-          let s = String.sub ibuf 0 p in
-            if p >= !(cli.ibuf_len) then
-              raise Not_found;
-            cli.ibuf_len := !(cli.ibuf_len) - (p + 1);
-            String.blit ibuf (p + 1) ibuf 0 !(cli.ibuf_len);
-            let parsed = Command.from_string s in
-              cli.handle_command cli parsed;
-              handle_input cli
+let crlf = Str.regexp "\r?\n"
+
+let handle_input cli =
+  let buf = Str.string_before cli.ibuf !(cli.ibuf_len) in
+  let lines = Str.split crlf buf in
+  let rec loop l =
+    match l with
+      | [] ->
+	  ()
+      | [leftover] ->
+	  String.blit leftover 0 cli.ibuf 0 (String.length leftover)
+      | line :: tl ->
+	  let parsed = Command.from_string line in
+	    cli.handle_command cli parsed;
+	    loop tl
+  in
+    loop lines
 
 let handle_event ues esys e =
   match e with
