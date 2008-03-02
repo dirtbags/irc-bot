@@ -21,7 +21,7 @@ section
     tests.cmo:
     tests$(EXT_OBJ):
 
-    OCamlProgram(tests, tests chat ircd irc command client channel)
+    OCamlProgram(tests, tests chat irc command client channel)
 
 .PHONY: clean
 clean:

@@ -153,7 +153,7 @@ let chat script proc =
   let _ = proc ues a in
   let _ = new chat_handler script ues b in
     try
-      Unixqueue.run ues
+      Unixqueue.run ues;
     with
       | Chat_match (got, expected) ->
 	  raise (Failure ("Not matched: got " ^

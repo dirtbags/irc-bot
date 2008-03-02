@@ -13,6 +13,7 @@ type t = {outq: Command.t Queue.t;
           username: string ref;
           realname: string ref}
 
+let dbg msg a = prerr_endline msg; a
 
 let by_file_descr = Hashtbl.create 25
 let by_nick = Hashtbl.create 25
@@ -69,15 +70,14 @@ let handle_command_login cli cmd =
      | (_, nick) ->
 	 write cli (Command.create
 		      ~sender:(Some !Irc.name)
-		      ~text:(Some "*** Hi there.")
-		      "NOTICE"
-		      [nick]))
+		      ~text:(Some "Welcome to IRC.")
+		      "001" [nick]))
 
 let crlf = Str.regexp "\r?\n"
 
 let handle_input cli =
   let buf = Str.string_before cli.ibuf !(cli.ibuf_len) in
-  let lines = Str.split crlf buf in
+  let lines = Str.split_delim crlf buf in
   let rec loop l =
     match l with
       | [] ->
