@@ -1,33 +1,27 @@
-type t = {sender: string option;
-	  name: string;
-	  args: string list;
-	  text: string option}
+type t = string option * string * string list * string option
 
 let create sender name args text =
-  {sender = sender;
-   name = name;
-   args = args;
-   text = text}
+  (sender, name, args, text)
 
 let anon = create None
 
-let as_string cmd =
+let as_string (sender, name, args, text) =
   let ret = Buffer.create 120 in
-    (match cmd.sender with
+    (match sender with
        | None -> 
 	   ()
        | Some s ->
 	   Buffer.add_char ret ':';
 	   Buffer.add_string ret s;
 	   Buffer.add_char ret ' ');
-    Buffer.add_string ret cmd.name;
-    (match cmd.args with
+    Buffer.add_string ret name;
+    (match args with
        | [] ->
 	   ()
        | l ->
 	   Buffer.add_char ret ' ';
 	   Buffer.add_string ret (String.concat " " l));
-    (match cmd.text with
+    (match text with
        | None ->
 	   ()
        | Some txt ->
@@ -49,12 +43,9 @@ let rec from_string line =
   let rec loop sender acc line =
     let c = (if (line = "") then None else (Some line.[0])) in
       match (c, acc) with
-     	| (None, cmd :: args) ->
+     	| (None, name :: args) ->
      	    (* End of line, no text part *)
-	    {sender = sender;
-	     name = cmd;
-	     args = args;
-	     text = None}
+	    create sender name args None
 	| (None, []) ->
 	    (* End of line, no text part, no args, no command *)
 	    raise (Failure "No command, eh?")
@@ -62,12 +53,9 @@ let rec from_string line =
 	    (* First word, starts with ':' *)
 	    let (word, rest) = extract_word line in
 	      loop (Some (Str.string_after word 1)) acc rest
-	| (Some ':', cmd :: args) ->
+	| (Some ':', name :: args) ->
 	    (* Not first word, starts with ':' *)
-	    {sender = sender;
-	     name = cmd;
-	     args = args;
-	     text = Some (Str.string_after line 1)}
+	    create sender name args (Some (Str.string_after line 1))
 	| (Some _, _) ->
 	    (* Argument *)
 	    let (word, rest) = extract_word line in
@@ -76,10 +64,9 @@ let rec from_string line =
     loop None [] line
 
 
-let as_tuple cmd =
-  (cmd.sender, cmd.name, cmd.args, cmd.text)
+let as_tuple cmd = cmd
 
-let sender cmd = cmd.sender
-let name cmd = cmd.name
-let args cmd = cmd.args
-let text cmd = cmd.text
+let sender (sender, name, args, text) = sender
+let name (sender, name, args, text) = name
+let args (sender, name, args, text) = args
+let text (sender, name, args, text) = text
