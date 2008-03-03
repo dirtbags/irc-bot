@@ -1,4 +1,5 @@
 let name = ref "irc.test"
+let version = "0.1"
 
 let newline_re = Pcre.regexp "\n\r?"
 let argsep_re = Pcre.regexp " :"

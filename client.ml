@@ -8,10 +8,12 @@ type t = {outq: Command.t Queue.t;
           ibuf: string;
           ibuf_len: int ref;
           output_ready: unit -> unit;
-          handle_command: t -> Command.t -> unit;
+          handle_command: (t -> Command.t -> unit) ref;
           nick: string ref;
           username: string ref;
           realname: string ref}
+
+let modes = "l"
 
 let dbg msg a = prerr_endline msg; a
 
@@ -47,31 +49,43 @@ let write cli cmd =
 let handle_close cli =
   ()
 
-let handle_command cli command =
-  ()
+let handle_command cli cmd =
+  write cli cmd
 
 let handle_command_login cli cmd =
   (* Handle a command during the login phase *)
-  (match (Command.as_tuple cmd) with
-     | (None, "USER", [username; _; _], Some realname) ->
-         cli.username := username;
-         cli.realname := Irc.truncate realname 40
-     | (None, "NICK", [nick], None) ->
-         cli.nick := nick;
-     | _ ->
-         write cli (Command.create 
-                      ~sender:(Some !Irc.name)
-                      ~text:(Some "Register first.")
-                      "451" ["*"]));
-  (match (!(cli.username), !(cli.nick)) with
-     | ("", _)
-     | (_, "") ->
-	 ()
-     | (_, nick) ->
-	 write cli (Command.create
-		      ~sender:(Some !Irc.name)
-		      ~text:(Some "Welcome to IRC.")
-		      "001" [nick]))
+  begin
+    match (Command.as_tuple cmd) with
+      | (None, "USER", [username; _; _], Some realname) ->
+          cli.username := username;
+          cli.realname := Irc.truncate realname 40
+      | (None, "NICK", [nick], None) ->
+          cli.nick := nick;
+      | _ ->
+          write cli (Command.create 
+                       (Some !Irc.name) "451" ["*"] (Some "Register first."))
+  end;
+  match (!(cli.username), !(cli.nick)) with
+    | ("", _)
+    | (_, "") ->
+	()
+    | (_, nick) ->
+	cli.handle_command := handle_command;
+	let command name text =
+	  write cli (Command.create 
+		       (Some !(Irc.name))
+		       name
+		       [nick]
+		       (Some text))
+	in
+	  command "001" "Welcome to IRC.";
+	  command "002" ("I am " ^ !(Irc.name) ^ 
+			   " running version " ^ Irc.version);
+	  command "003" "This server was created sometime";
+	  command "004" (!(Irc.name) ^
+			   " " ^ Irc.version ^
+			   " " ^ modes ^
+			   " " ^ Channel.modes)
 
 let crlf = Str.regexp "\r?\n"
 
@@ -86,7 +100,7 @@ let handle_input cli =
 	  String.blit leftover 0 cli.ibuf 0 (String.length leftover)
       | line :: tl ->
 	  let parsed = Command.from_string line in
-	    cli.handle_command cli parsed;
+	    !(cli.handle_command) cli parsed;
 	    loop tl
   in
     loop lines
@@ -145,7 +159,7 @@ let create ues g fd =
 	begin
           fun () -> Unixqueue.add_resource ues g (Unixqueue.Wait_out fd, -.1.0)
 	end;
-     handle_command = handle_command_login;
+     handle_command = ref handle_command_login;
      nick = ref "";
      username = ref "";
      realname = ref ""}

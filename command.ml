@@ -3,11 +3,13 @@ type t = {sender: string option;
 	  args: string list;
 	  text: string option}
 
-let create ?(sender=None) ?(text=None) name args =
+let create sender name args text =
   {sender = sender;
    name = name;
    args = args;
    text = text}
+
+let anon = create None
 
 let as_string cmd =
   let ret = Buffer.create 120 in
