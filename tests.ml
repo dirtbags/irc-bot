@@ -27,9 +27,7 @@ let unit_tests =
 	     (Command.from_string ":foo NICK name");
 	   assert_equal
 	     ~printer:Command.as_string
-	     (Command.create 
-		(Some "foo.bar") 
-		"PART" ["#foo"; "#bar"]
+	     (Command.create (Some "foo.bar") "PART" ["#foo"; "#bar"]
 		(Some "ta ta"))
 	     (Command.from_string ":foo.bar PART #foo #bar :ta ta");
 	)

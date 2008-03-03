@@ -97,7 +97,8 @@ let handle_input cli =
       | [] ->
 	  ()
       | [leftover] ->
-	  String.blit leftover 0 cli.ibuf 0 (String.length leftover)
+	  cli.ibuf_len := (String.length leftover);
+	  String.blit leftover 0 cli.ibuf 0 !(cli.ibuf_len)
       | line :: tl ->
 	  let parsed = Command.from_string line in
 	    !(cli.handle_command) cli parsed;
