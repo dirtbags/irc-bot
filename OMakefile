@@ -9,7 +9,7 @@ OCAMLCFLAGS += -g
 
 .DEFAULT: ircd
 
-OCamlProgram(ircd, ircd irc command client channel)
+OCamlProgram(ircd, ircd irc command iobuf client channel)
 
 section
     OCAMLPACKS[] +=
@@ -21,7 +21,7 @@ section
     tests.cmo:
     tests$(EXT_OBJ):
 
-    OCamlProgram(tests, tests chat irc command client channel)
+    OCamlProgram(tests, tests chat irc command iobuf client channel)
 
 .PHONY: clean
 clean:

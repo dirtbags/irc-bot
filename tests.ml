@@ -6,9 +6,8 @@ open Irc
 let do_chat script () =
   let ircd_instance ues fd =
     let g = Unixqueue.new_group ues in
-      ignore (Client.create ues g fd);
-      Unixqueue.add_handler ues g Client.handle_event;
-      Unixqueue.add_resource ues g (Unixqueue.Wait_in fd, -.1.0)
+      Iobuf.add_event_handler ues g;
+      Iobuf.bind ues g fd (Client.create_command_handler ())
   in
     chat script ircd_instance
 
