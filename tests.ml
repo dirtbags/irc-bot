@@ -65,6 +65,10 @@ let regression_tests =
                       Recv ":testserver.test PONG testserver.test :snot\r\n";
                       Send "PING :snot\r\n";
                       Recv ":testserver.test PONG testserver.test :snot\r\n";
+		      Send "ISON nick otherguy\r\n";
+		      Recv ":testserver.test 303 nick :nick\r\n";
+		      Send "ISON otherguy thirdguy\r\n";
+		      Recv ":testserver.test 303 nick :\r\n";
                     ]));
     ]
 

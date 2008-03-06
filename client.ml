@@ -16,7 +16,6 @@ let modes = "l"
 
 let dbg msg a = prerr_endline msg; a
 
-let by_file_descr = Hashtbl.create 25
 let by_nick = Hashtbl.create 25
 
 let error num args text =
@@ -24,7 +23,6 @@ let error num args text =
 
 let close cli ues g fd =
   Hashtbl.remove by_nick !(cli.nick);
-  Hashtbl.remove by_file_descr fd;
   Unix.close fd;
   Unixqueue.remove_resource ues g (Unixqueue.Wait_in fd);
   try
@@ -136,7 +134,8 @@ let handle_command cli iobuf cmd =
     | (None, "WALLOPS", [], Some text) ->
         ()
     | (None, "ISON", nicks, None) ->
-        ()
+	let ison = List.filter (Hashtbl.mem by_nick) nicks in
+	  reply cli "303" (String.concat " " ison)
     | (_, name, _, _) ->
         reply cli "421" ~args:[name] "Unknown or misconstructed command"
 
