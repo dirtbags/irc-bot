@@ -48,8 +48,15 @@ let regression_tests =
     [
       "Simple connection" >::
 	(do_chat ((do_login "nick") @
-		    [Send "WELCOME :datacomp\r\n";
-		     Recv "WELCOME :datacomp\r\n"]));
+		    [Send "BLARGH\r\n";
+                     Recv ":testserver.test 421 nick BLARGH :Unknown or misconstructed command\r\n";
+                     Send "MOTD\r\n";
+		     Recv ":testserver.test 422 nick :MOTD File is missing\r\n";
+                     Send "TIME\r\n";
+                     Regex ":testserver\\.test 391 nick testserver\\.test :[-0-9]+T[:0-9]+Z\r\n";
+                     Send "VERSION\r\n";
+                     Recv ":testserver.test 351 nick 0.1 testserver.test :\r\n";
+                    ]));
     ]
 
 let _ =
