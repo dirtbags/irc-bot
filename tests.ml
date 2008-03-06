@@ -38,7 +38,7 @@ let do_login nick =
     Send ("USER " ^ nick ^ " +iw " ^ nick ^ " :gecos\r\n");
     Send ("NICK " ^ nick ^ "\r\n");
     Recv (":testserver.test 001 " ^ nick ^ " :Welcome to IRC.\r\n");
-    Recv (":testserver.test 002 " ^ nick ^ " :I am testserver.test running version " ^ Irc.version ^ "\r\n");
+    Recv (":testserver.test 002 " ^ nick ^ " :I am testserver.test Running version " ^ Irc.version ^ "\r\n");
     Recv (":testserver.test 003 " ^ nick ^ " :This server was created sometime\r\n");
     Recv (":testserver.test 004 " ^ nick ^ " :testserver.test 0.1 l t\r\n");
   ]

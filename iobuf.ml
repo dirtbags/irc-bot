@@ -8,7 +8,7 @@ type t = {ues: Unixqueue.event_system;
           unsent: string ref;
           ibuf: string;
           ibuf_len: int ref;
-          handle_command: t -> Command.t -> unit}
+          handle_command: (t -> Command.t -> unit) ref}
 
 let ibuf_max = 4096
 let max_outq = 50
@@ -18,11 +18,7 @@ let by_file_descr = Hashtbl.create 25
 
 let bind ues grp fd handle_command =
   let (outq, unsent, ibuf, ibuf_len) =
-    try
-      let old = Hashtbl.find by_file_descr fd in
-        (old.outq, old.unsent, old.ibuf, old.ibuf_len)
-    with Not_found ->
-      (Queue.create (), ref "", String.create ibuf_max, ref 0)
+    (Queue.create (), ref "", String.create ibuf_max, ref 0)
   in
   let iobuf = {ues = ues;
                grp = grp;
@@ -31,13 +27,13 @@ let bind ues grp fd handle_command =
                unsent = unsent;
                ibuf = ibuf;
                ibuf_len = ibuf_len;
-               handle_command = handle_command}
+               handle_command = ref handle_command}
   in
     Hashtbl.replace by_file_descr fd iobuf;
     Unixqueue.add_resource ues grp (Unixqueue.Wait_in fd, -.1.0)
 
 let rebind t handle_command =
-  bind t.ues t.grp t.fd handle_command
+  t.handle_command := handle_command
 
 let write iobuf cmd =
   let was_empty = Queue.is_empty iobuf.outq in
@@ -69,7 +65,7 @@ let handle_input iobuf =
 	  String.blit leftover 0 iobuf.ibuf 0 !(iobuf.ibuf_len)
       | line :: tl ->
 	  let parsed = Command.from_string line in
-	    iobuf.handle_command iobuf parsed;
+	    !(iobuf.handle_command) iobuf parsed;
 	    loop tl
   in
     loop lines
