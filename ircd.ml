@@ -28,10 +28,9 @@ let main () =
   let ues = Unixqueue.create_unix_event_system () in
   let g = Unixqueue.new_group ues in
   let handle_connection fd =
-    ignore (Client.create ues g fd);
-    Unixqueue.add_resource ues g (Unixqueue.Wait_in fd, -.1.0)
+    Iobuf.bind ues g fd (Client.create_command_handler ())
   in
-    Unixqueue.add_handler ues g Client.handle_event;
+    Iobuf.add_event_handler ues g;
     establish_server
       ues
       handle_connection
