@@ -45,7 +45,7 @@ let rec from_string line =
       match (c, acc) with
      	| (None, name :: args) ->
      	    (* End of line, no text part *)
-	    create sender name args None
+	    create sender (String.uppercase name) args None
 	| (None, []) ->
 	    (* End of line, no text part, no args, no command *)
 	    raise (Failure "No command, eh?")
@@ -55,7 +55,7 @@ let rec from_string line =
 	      loop (Some (Str.string_after word 1)) acc rest
 	| (Some ':', name :: args) ->
 	    (* Not first word, starts with ':' *)
-	    create sender name args (Some (Str.string_after line 1))
+	    create sender (String.uppercase name) args (Some (Str.string_after line 1))
 	| (Some _, _) ->
 	    (* Argument *)
 	    let (word, rest) = extract_word line in

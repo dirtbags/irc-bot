@@ -22,6 +22,10 @@ let unit_tests =
 	     (Command.from_string "NICK name");
 	   assert_equal
 	     ~printer:Command.as_string
+	     (Command.create None "NICK" ["name"] None)
+	     (Command.from_string "nick name");
+	   assert_equal
+	     ~printer:Command.as_string
 	     (Command.create (Some "foo") "NICK" ["name"] None)
 	     (Command.from_string ":foo NICK name");
 	   assert_equal
@@ -48,14 +52,19 @@ let regression_tests =
     [
       "Simple connection" >::
 	(do_chat ((do_login "nick") @
-		    [Send "BLARGH\r\n";
-                     Recv ":testserver.test 421 nick BLARGH :Unknown or misconstructed command\r\n";
-                     Send "MOTD\r\n";
-		     Recv ":testserver.test 422 nick :MOTD File is missing\r\n";
-                     Send "TIME\r\n";
-                     Regex ":testserver\\.test 391 nick testserver\\.test :[-0-9]+T[:0-9]+Z\r\n";
-                     Send "VERSION\r\n";
-                     Recv ":testserver.test 351 nick 0.1 testserver.test :\r\n";
+		    [
+                      Send "BLARGH\r\n";
+                      Recv ":testserver.test 421 nick BLARGH :Unknown or misconstructed command\r\n";
+                      Send "MOTD\r\n";
+		      Recv ":testserver.test 422 nick :MOTD File is missing\r\n";
+                      Send "TIME\r\n";
+                      Regex ":testserver\\.test 391 nick testserver\\.test :[-0-9]+T[:0-9]+Z\r\n";
+                      Send "VERSION\r\n";
+                      Recv ":testserver.test 351 nick 0.1 testserver.test :\r\n";
+                      Send "PING snot\r\n";
+                      Recv ":testserver.test PONG testserver.test :snot\r\n";
+                      Send "PING :snot\r\n";
+                      Recv ":testserver.test PONG testserver.test :snot\r\n";
                     ]));
     ]
 

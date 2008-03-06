@@ -116,9 +116,10 @@ let handle_command cli iobuf cmd =
         ()
     | (None, "KILL", [nickname; comment], None) ->
         ()
-    | (None, "PING", [server], None) ->
-        ()
-    | (None, "PONG", [server], None) ->
+    | (None, "PING", [], Some text)
+    | (None, "PING", [text], None) ->
+        write cli (Command.create (Some !(Irc.name)) "PONG" [!(Irc.name)] (Some text))
+    | (None, "PONG", [payload], None) ->
         ()
     | (None, "ERROR", [], Some message) ->
         ()
