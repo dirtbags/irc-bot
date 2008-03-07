@@ -3,13 +3,7 @@ open OUnit
 open Chat
 open Irc
 
-let do_chat script () =
-  let ircd_instance ues fd =
-    let g = Unixqueue.new_group ues in
-      Unixqueue.add_handler ues g Iobuf.handle_event;
-      Client.handle_connection ues g fd
-  in
-    chat script ircd_instance
+let ues = Unixqueue.create_unix_event_system ()
 
 let unit_tests =
   "Unit tests" >:::
@@ -37,6 +31,7 @@ let unit_tests =
     ]
       
 
+
 let do_login nick =
   [
     Send ("USER " ^ nick ^ " +iw " ^ nick ^ " :gecos\r\n");
@@ -51,38 +46,86 @@ let regression_tests =
   "Regression tests" >:::
     [
       "Simple connection" >::
-	(do_chat ((do_login "nick") @
-		    [
-                      Send "BLARGH\r\n";
-                      Recv ":testserver.test 421 nick BLARGH :Unknown or misconstructed command\r\n";
-                      Send "MOTD\r\n";
-		      Recv ":testserver.test 422 nick :MOTD File is missing\r\n";
-                      Send "TIME\r\n";
-                      Regex ":testserver\\.test 391 nick testserver\\.test :[-0-9]+T[:0-9]+Z\r\n";
-                      Send "VERSION\r\n";
-                      Recv ":testserver.test 351 nick 0.1 testserver.test :\r\n";
-                      Send "PING snot\r\n";
-                      Recv ":testserver.test PONG testserver.test :snot\r\n";
-                      Send "PING :snot\r\n";
-                      Recv ":testserver.test PONG testserver.test :snot\r\n";
-		      Send "ISON nick otherguy\r\n";
-		      Recv ":testserver.test 303 nick :nick\r\n";
-		      Send "ISON otherguy thirdguy\r\n";
-		      Recv ":testserver.test 303 nick :\r\n";
-                      Send "PRIVMSG nick :hello\r\n";
-                      Recv ":nick!nick@UDS PRIVMSG nick :hello\r\n";
-                      Send "NOTICE nick :hello\r\n";
-                      Recv ":nick!nick@UDS NOTICE nick :hello\r\n";
-                      Send "PRIVMSG otherguy :hello\r\n";
-                      Recv ":testserver.test 401 nick otherguy :No such nick/channel\r\n";
-                    ]));
+        (fun () ->
+           let script =
+             (do_login "nick") @
+	       [
+                 Send "BLARGH\r\n";
+                 Recv ":testserver.test 421 nick BLARGH :Unknown or misconstructed command\r\n";
+                 Send "MOTD\r\n";
+		 Recv ":testserver.test 422 nick :MOTD File is missing\r\n";
+                 Send "TIME\r\n";
+                 Regex ":testserver\\.test 391 nick testserver\\.test :[-0-9]+T[:0-9]+Z\r\n";
+                 Send "VERSION\r\n";
+                 Recv ":testserver.test 351 nick 0.1 testserver.test :\r\n";
+                 Send "PING snot\r\n";
+                 Recv ":testserver.test PONG testserver.test :snot\r\n";
+                 Send "PING :snot\r\n";
+                 Recv ":testserver.test PONG testserver.test :snot\r\n";
+		 Send "ISON nick otherguy\r\n";
+		 Recv ":testserver.test 303 nick :nick\r\n";
+		 Send "ISON otherguy thirdguy\r\n";
+		 Recv ":testserver.test 303 nick :\r\n";
+                 Send "PRIVMSG nick :hello\r\n";
+                 Recv ":nick!nick@UDS PRIVMSG nick :hello\r\n";
+                 Send "NOTICE nick :hello\r\n";
+                 Recv ":nick!nick@UDS NOTICE nick :hello\r\n";
+                 Send "PRIVMSG otherguy :hello\r\n";
+                 Recv ":testserver.test 401 nick otherguy :No such nick/channel\r\n";
+               ]
+           in
+           let g = Unixqueue.new_group ues in
+           let a,b = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
+             Unixqueue.add_handler ues g Iobuf.handle_event;
+             Client.handle_connection ues g a;
+             ignore (new chat_handler script ues b);
+             chat_run ues);
 
       "Second connection" >::
-	(do_chat ((do_login "otherguy") @
-		    [
-		      Send "ISON nick otherguy\r\n";
-		      Recv ":testserver.test 303 otherguy :otherguy\r\n";
-		    ]));
+	(fun () ->
+           let script =
+             (do_login "otherguy") @
+	       [
+		 Send "ISON nick otherguy\r\n";
+		 Recv ":testserver.test 303 otherguy :otherguy\r\n";
+	       ]
+           in
+           let g = Unixqueue.new_group ues in
+           let a,b = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
+             Unixqueue.add_handler ues g Iobuf.handle_event;
+             Client.handle_connection ues g a;
+             ignore (new chat_handler script ues b);
+             chat_run ues);
+
+      "Simultaneous connections" >::
+        (fun () ->
+           let script1 =
+             (do_login "alice") @
+               [
+                 Send "ISON bob\r\n";
+                 Recv ":testserver.test 303 alice :bob\r\n";
+                 Send "PRIVMSG bob :Hi Bob!\r\n";
+                 Send "PING :foo\r\n";  (* Make sure we don't disconnect too soon *)
+                 Recv ":testserver.test PONG testserver.test :foo\r\n";
+               ]
+           in
+           let script2 =
+             (do_login "bob") @
+               [
+                 Send "ISON alice\r\n";
+                 Recv ":testserver.test 303 bob :alice\r\n";
+                 Recv ":alice!alice@UDS PRIVMSG bob :Hi Bob!\r\n";
+               ]
+           in
+           let g = Unixqueue.new_group ues in
+           let aa,ab = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
+           let ba,bb = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
+             Unixqueue.add_handler ues g Iobuf.handle_event;
+             Client.handle_connection ues g aa;
+             Client.handle_connection ues g ba;
+             ignore (new chat_handler script1 ues ab);
+             ignore (new chat_handler script2 ues bb);
+             chat_run ues);
     ]
 
 let _ =

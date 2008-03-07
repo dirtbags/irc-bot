@@ -161,6 +161,11 @@ object (self)
 end
 
 
+let chat_create ues script proc =
+  let a,b = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
+    ignore (proc ues a);
+    ignore (new chat_handler script ues b)
+
 (** Run a chat script
 
     [chat script proc] will create a Unix domain socket pair, call [proc
@@ -168,20 +173,16 @@ end
     [script] through it.
 *)
 
-let chat script proc =
-  let ues = new unix_event_system () in
-  let a,b = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
-  let _ = proc ues a in
-  let _ = new chat_handler script ues b in
-    try
-      Unixqueue.run ues;
-    with
-      | Chat_match (got, expected) ->
-          raise (Failure ("Not matched: got \"" ^
-                            (String.escaped got) ^
-                            "\"\n  expected " ^
-                            (string_of_chat_event expected)))
-      | Chat_timeout evt ->
-          raise (Failure ("Timeout waiting for " ^
-                            (string_of_chat_event evt)))
+let chat_run ues =
+  try
+    Unixqueue.run ues;
+  with
+    | Chat_match (got, expected) ->
+        raise (Failure ("Not matched: got \"" ^
+                          (String.escaped got) ^
+                          "\"\n  expected " ^
+                          (string_of_chat_event expected)))
+    | Chat_timeout evt ->
+        raise (Failure ("Timeout waiting for " ^
+                          (string_of_chat_event evt)))
 
