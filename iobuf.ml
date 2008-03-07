@@ -8,6 +8,7 @@ type t = {ues: Unixqueue.event_system;
           unsent: string ref;
           ibuf: string;
           ibuf_len: int ref;
+          addr: string;
           command_handler: (t -> Command.t -> unit) ref;
 	  close_handler: (unit -> unit) ref}
 
@@ -16,6 +17,8 @@ let max_outq = 50
 let obuf_max = 4096
 
 let by_file_descr = Hashtbl.create 25
+
+let addr iobuf = iobuf.addr
 
 let write iobuf cmd =
   let was_empty = Queue.is_empty iobuf.outq in
@@ -107,6 +110,13 @@ let bind ues grp fd command_handler close_handler =
   let (outq, unsent, ibuf, ibuf_len) =
     (Queue.create (), ref "", String.create ibuf_max, ref 0)
   in
+  let addr =
+    match Unix.getpeername fd with
+      | Unix.ADDR_UNIX s ->
+          "UDS"
+      | Unix.ADDR_INET (addr, port) ->
+          Unix.string_of_inet_addr addr
+  in
   let iobuf = {ues = ues;
                grp = grp;
                fd = fd;
@@ -114,6 +124,7 @@ let bind ues grp fd command_handler close_handler =
                unsent = unsent;
                ibuf = ibuf;
                ibuf_len = ibuf_len;
+               addr = addr;
                command_handler = ref command_handler;
 	       close_handler = ref close_handler}
   in

@@ -9,3 +9,11 @@ let lookup name =
 
 let create name =
   {name = name}
+
+let is_channel_name name =
+  match name.[0] with
+    | '#' | '&' | '!' | '+' ->
+        true
+    | _ ->
+        false
+  

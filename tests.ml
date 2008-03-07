@@ -69,6 +69,12 @@ let regression_tests =
 		      Recv ":testserver.test 303 nick :nick\r\n";
 		      Send "ISON otherguy thirdguy\r\n";
 		      Recv ":testserver.test 303 nick :\r\n";
+                      Send "PRIVMSG nick :hello\r\n";
+                      Recv ":nick!nick@UDS PRIVMSG nick :hello\r\n";
+                      Send "NOTICE nick :hello\r\n";
+                      Recv ":nick!nick@UDS NOTICE nick :hello\r\n";
+                      Send "PRIVMSG otherguy :hello\r\n";
+                      Recv ":testserver.test 401 nick otherguy :No such nick/channel\r\n";
                     ]));
 
       "Second connection" >::

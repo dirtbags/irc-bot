@@ -18,8 +18,14 @@ let dbg msg a = prerr_endline msg; a
 
 let by_nick = Hashtbl.create 25
 
+let lookup nick =
+  Hashtbl.find by_nick nick
+
 let error num args text =
   Error (Command.create (Some !(Irc.name)) num args (Some text))
+
+let uhost cli =
+  (!(cli.nick) ^ "!" ^ cli.username ^ "@" ^ (Iobuf.addr cli.iobuf))
 
 let close cli =
   Iobuf.close cli.iobuf
@@ -67,10 +73,22 @@ let handle_command cli iobuf cmd =
         ()
     | (None, "KICK", [channels; users], comment) ->
         ()
-    | (None, "PRIVMSG", [target], Some text) ->
-        ()
-    | (None, "NOTICE", [target], Some text) ->
-        ()
+    | (None, ("PRIVMSG" as command), [target], Some text)
+    | (None, ("NOTICE" as command), [target], Some text) ->
+        if Channel.is_channel_name target then
+          reply cli "403" ~args:[target] "No such channel"
+        else
+          begin
+            try
+              let peer = lookup target in
+                write peer (Command.create
+                              (Some (uhost cli))
+                              command
+                              [target]
+                              (Some text))
+            with Not_found ->
+              reply cli "401" ~args:[target] "No such nick/channel"
+          end
     | (None, "MOTD", [], None) ->
         reply cli "422" "MOTD File is missing"
     | (None, "LUSERS", [], None) ->
