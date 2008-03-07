@@ -27,13 +27,10 @@ let establish_server ues connection_handler addr =
 let main () =
   let ues = Unixqueue.create_unix_event_system () in
   let g = Unixqueue.new_group ues in
-  let handle_connection fd =
-    Iobuf.bind ues g fd (Client.create_command_handler ())
-  in
-    Iobuf.add_event_handler ues g;
+    Unixqueue.add_handler ues g Iobuf.handle_event;
     establish_server
       ues
-      handle_connection
+      Client.handle_connection
       (Unix.ADDR_INET (Unix.inet_addr_any, 7777));
     ues#run ()
 

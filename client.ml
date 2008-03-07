@@ -21,14 +21,8 @@ let by_nick = Hashtbl.create 25
 let error num args text =
   Error (Command.create (Some !(Irc.name)) num args (Some text))
 
-let close cli ues g fd =
-  Hashtbl.remove by_nick !(cli.nick);
-  Unix.close fd;
-  Unixqueue.remove_resource ues g (Unixqueue.Wait_in fd);
-  try
-    Unixqueue.remove_resource ues g (Unixqueue.Wait_out fd);
-  with Not_found ->
-    ()
+let close cli =
+  Iobuf.close cli.iobuf
 
 let write cli cmd =
   Iobuf.write cli.iobuf cmd
@@ -39,6 +33,9 @@ let reply cli num ?(args=[]) text =
                num
                ([!(cli.nick)] @ args)
                (Some text))
+
+let handle_close cli () =
+  Hashtbl.remove by_nick !(cli.nick)
 
 let handle_command cli iobuf cmd =
   match (Command.as_tuple cmd) with
@@ -174,7 +171,7 @@ let rec handle_command_prereg (nick', username', realname', password') iobuf cmd
                          " " ^ Irc.version ^
                          " " ^ modes ^
                          " " ^ Channel.modes);
-      Iobuf.rebind iobuf (handle_command cli)
+      Iobuf.rebind iobuf (handle_command cli) (handle_close cli)
     with Error cmd ->
       Iobuf.write iobuf cmd
   in
@@ -194,7 +191,10 @@ let rec handle_command_prereg (nick', username', realname', password') iobuf cmd
                  username = username;
                  realname = realname}
     | _ ->
-        Iobuf.rebind iobuf (handle_command_prereg acc)
+        Iobuf.rebind iobuf (handle_command_prereg acc) ignore
 
-let create_command_handler () =
-  handle_command_prereg (None, None, None, None)
+let handle_connection ues grp fd =
+  let command_handler = handle_command_prereg (None, None, None, None) in
+  let close_handler = ignore in
+    Iobuf.bind ues grp fd command_handler close_handler
+    

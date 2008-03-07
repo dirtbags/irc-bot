@@ -8,32 +8,14 @@ type t = {ues: Unixqueue.event_system;
           unsent: string ref;
           ibuf: string;
           ibuf_len: int ref;
-          handle_command: (t -> Command.t -> unit) ref}
+          command_handler: (t -> Command.t -> unit) ref;
+	  close_handler: (unit -> unit) ref}
 
 let ibuf_max = 4096
 let max_outq = 50
 let obuf_max = 4096
 
 let by_file_descr = Hashtbl.create 25
-
-let bind ues grp fd handle_command =
-  let (outq, unsent, ibuf, ibuf_len) =
-    (Queue.create (), ref "", String.create ibuf_max, ref 0)
-  in
-  let iobuf = {ues = ues;
-               grp = grp;
-               fd = fd;
-               outq = outq;
-               unsent = unsent;
-               ibuf = ibuf;
-               ibuf_len = ibuf_len;
-               handle_command = ref handle_command}
-  in
-    Hashtbl.replace by_file_descr fd iobuf;
-    Unixqueue.add_resource ues grp (Unixqueue.Wait_in fd, -.1.0)
-
-let rebind t handle_command =
-  t.handle_command := handle_command
 
 let write iobuf cmd =
   let was_empty = Queue.is_empty iobuf.outq in
@@ -43,11 +25,19 @@ let write iobuf cmd =
         iobuf.ues iobuf.grp (Unixqueue.Wait_out iobuf.fd, -.1.0)
 
 let close iobuf =
+  !(iobuf.close_handler) ();
   Hashtbl.remove by_file_descr iobuf.fd;
   Unix.close iobuf.fd;
   Unixqueue.remove_resource iobuf.ues iobuf.grp (Unixqueue.Wait_in iobuf.fd);
   try
     Unixqueue.remove_resource iobuf.ues iobuf.grp (Unixqueue.Wait_out iobuf.fd);
+  with Not_found ->
+    ()
+
+let handle_close fd =
+  try
+    let iobuf = Hashtbl.find by_file_descr fd in
+      close iobuf
   with Not_found ->
     ()
 
@@ -65,7 +55,7 @@ let handle_input iobuf =
 	  String.blit leftover 0 iobuf.ibuf 0 !(iobuf.ibuf_len)
       | line :: tl ->
 	  let parsed = Command.from_string line in
-	    !(iobuf.handle_command) iobuf parsed;
+	    !(iobuf.command_handler) iobuf parsed;
 	    loop tl
   in
     loop lines
@@ -113,5 +103,24 @@ let handle_event ues esys e =
     | Unixqueue.Extra exn ->
         print_endline "extra"
 
-let add_event_handler ues g =
-  Unixqueue.add_handler ues g handle_event
+let bind ues grp fd command_handler close_handler =
+  let (outq, unsent, ibuf, ibuf_len) =
+    (Queue.create (), ref "", String.create ibuf_max, ref 0)
+  in
+  let iobuf = {ues = ues;
+               grp = grp;
+               fd = fd;
+               outq = outq;
+               unsent = unsent;
+               ibuf = ibuf;
+               ibuf_len = ibuf_len;
+               command_handler = ref command_handler;
+	       close_handler = ref close_handler}
+  in
+    Hashtbl.replace by_file_descr fd iobuf;
+    Unixqueue.add_resource ues grp (Unixqueue.Wait_in fd, -.1.0);
+    Unixqueue.add_close_action ues grp (fd, handle_close)
+
+let rebind t command_handler close_handler =
+  t.command_handler := command_handler;
+  t.close_handler := close_handler

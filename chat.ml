@@ -177,9 +177,9 @@ let chat script proc =
       Unixqueue.run ues;
     with
       | Chat_match (got, expected) ->
-          raise (Failure ("Not matched: got " ^
+          raise (Failure ("Not matched: got \"" ^
                             (String.escaped got) ^
-                            ", expected " ^
+                            "\"\n  expected " ^
                             (string_of_chat_event expected)))
       | Chat_timeout evt ->
           raise (Failure ("Timeout waiting for " ^

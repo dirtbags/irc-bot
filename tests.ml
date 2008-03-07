@@ -6,8 +6,8 @@ open Irc
 let do_chat script () =
   let ircd_instance ues fd =
     let g = Unixqueue.new_group ues in
-      Iobuf.add_event_handler ues g;
-      Iobuf.bind ues g fd (Client.create_command_handler ())
+      Unixqueue.add_handler ues g Iobuf.handle_event;
+      Client.handle_connection ues g fd
   in
     chat script ircd_instance
 
@@ -70,6 +70,13 @@ let regression_tests =
 		      Send "ISON otherguy thirdguy\r\n";
 		      Recv ":testserver.test 303 nick :\r\n";
                     ]));
+
+      "Second connection" >::
+	(do_chat ((do_login "otherguy") @
+		    [
+		      Send "ISON nick otherguy\r\n";
+		      Recv ":testserver.test 303 otherguy :otherguy\r\n";
+		    ]));
     ]
 
 let _ =
