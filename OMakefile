@@ -1,15 +1,17 @@
-USE_OCAMLFIND = true
 OCAMLPACKS[] = 
     equeue
     pcre
     str
-NATIVE_ENABLED = true
-BYTE_ENABLED = true
 OCAMLCFLAGS += -g
 
 .DEFAULT: ircd
 
 OCamlProgram(ircd, ircd irc command iobuf client channel)
+
+section
+    OCAML_CLIBS = ocamlpoll
+    StaticCLibrary(ocamlpoll, inspect poll_stubs)
+    OCamlProgram(polltest, polltest)
 
 section
     OCAMLPACKS[] +=
@@ -22,6 +24,10 @@ section
     tests$(EXT_OBJ):
 
     OCamlProgram(tests, tests chat irc command iobuf client channel)
+
+.PHONY: test
+test: tests
+	./tests
 
 .PHONY: clean
 clean:
