@@ -10,7 +10,7 @@ OCamlProgram(ircd, ircd irc command iobuf client channel)
 
 section
     OCAML_CLIBS = ocamlpoll
-    StaticCLibrary(ocamlpoll, inspect poll_stubs)
+    StaticCLibrary(ocamlpoll, poll_wrapper)
     OCamlProgram(polltest, polltest)
 
 section
