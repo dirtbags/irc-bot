@@ -2,16 +2,14 @@ OCAMLPACKS[] =
     equeue
     pcre
     str
+OCAML_CLIBS = ocamlepoll
 OCAMLCFLAGS += -g
 
 .DEFAULT: ircd
 
-OCamlProgram(ircd, ircd irc command iobuf client channel)
+StaticCLibrary(ocamlepoll, epoll_wrapper)
 
-section
-    OCAML_CLIBS = ocamlpoll
-    StaticCLibrary(ocamlpoll, poll_wrapper)
-    OCamlProgram(polltest, polltest)
+OCamlProgram(ircd, ircd irc command iobuf client channel)
 
 section
     OCAMLPACKS[] +=

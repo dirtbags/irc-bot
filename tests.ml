@@ -5,9 +5,105 @@ open Irc
 
 let ues = Unixqueue.create_unix_event_system ()
 
+let int_of_file_descr fd = (Obj.magic fd) + 0
+
+let rec epollevents_as_list events =
+  match events with
+    | [] ->
+	[]
+    | Epoll.In :: tl ->
+	"POLLIN" :: (epollevents_as_list tl)
+    | Epoll.Priority :: tl ->
+	"POLLPRI" :: (epollevents_as_list tl)
+    | Epoll.Out :: tl ->
+	"POLLOUT" :: (epollevents_as_list tl)
+    | Epoll.Error :: tl ->
+	"POLLERR" :: (epollevents_as_list tl)
+    | Epoll.Hangup :: tl ->
+	"POLLHUP" :: (epollevents_as_list tl)
+
+let rec epollfds_as_list pfds =
+  match pfds with
+    | [] ->
+	[]
+    | (fd, events) :: tl ->
+	(Printf.sprintf "{fd=%d; events=%s}"
+	   (int_of_file_descr fd)
+	   (String.concat "|" (epollevents_as_list events))) :: 
+	  epollfds_as_list tl
+
+let epollfds_as_string pfds =
+  "[" ^ (String.concat ", " (epollfds_as_list pfds)) ^ "]"
+
 let unit_tests =
   "Unit tests" >:::
     [
+      "epoll" >::
+	(fun () ->
+           let a,b = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
+	   let e = Epoll.create 1 in
+	     Epoll.ctl e Epoll.Add (a, [Epoll.Out; Epoll.In]);
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       [(a, [Epoll.Out])]
+	       (Epoll.wait e 1 0);
+
+	     Epoll.ctl e Epoll.Modify (a, [Epoll.In; Epoll.Priority]);
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       []
+	       (Epoll.wait e 1 0);
+
+	     Epoll.ctl e Epoll.Add (b, [Epoll.Out; Epoll.In]);
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       [(b, [Epoll.Out])]
+	       (Epoll.wait e 2 0);
+
+	     Epoll.ctl e Epoll.Modify (a, [Epoll.Out; Epoll.In]);
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       [(a, [Epoll.Out]); (b, [Epoll.Out])]
+	       (Epoll.wait e 2 0);
+
+	     Epoll.ctl e Epoll.Modify (a, [Epoll.Out; Epoll.In]);
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       [(b, [Epoll.Out])]
+	       (Epoll.wait e 1 0);
+
+	     Epoll.ctl e Epoll.Delete (a, []);
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       [(b, [Epoll.Out])]
+	       (Epoll.wait e 2 0);
+	     assert_raises 
+	       (Failure "ocaml_epoll_ctl: No such file or directory")
+	       (fun () ->
+		  Epoll.ctl e Epoll.Modify (a, [Epoll.In; Epoll.Priority]));
+	     assert_raises 
+	       (Failure "ocaml_epoll_ctl: File exists")
+	       (fun () ->
+		  Epoll.ctl e Epoll.Add (b, [Epoll.In; Epoll.Priority]));
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       [(b, [Epoll.Out])]
+	       (Epoll.wait e 2 0);
+
+	     Unix.close b;
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       []
+	       (Epoll.wait e 2 0);
+	     assert_raises 
+	       (Failure "ocaml_epoll_ctl: Bad file descriptor")
+	       (fun () ->
+		  Epoll.ctl e Epoll.Modify (b, [Epoll.In; Epoll.Priority]));
+
+	     Epoll.destroy e;
+	     Unix.close a
+	);
+
       "command_of_string" >:: 
 	(fun () ->
 	   assert_equal
