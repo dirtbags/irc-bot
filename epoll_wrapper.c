@@ -1,6 +1,6 @@
 /** OCaml poll() interface
  *
- * Time-stamp: <2008-03-10 23:56:36 neale>
+ * Time-stamp: <2008-03-11 17:44:00 neale>
  *
  * Copyright (C) 2008 Neale Pickett
  *
@@ -129,16 +129,21 @@ event_list_of_int(int events)
 
   result = Val_int(0);
 
+  /* Do these in reverse order since we're prepending to the list */
+  if (events & EPOLLHUP) {
+    result = cons(Val_int(caml_POLLHUP), result);
+  }
+  if (events & EPOLLERR) {
+    result = cons(Val_int(caml_POLLERR), result);
+  }
+  if (events & EPOLLOUT) {
+    result = cons(Val_int(caml_POLLOUT), result);
+  }
+  if (events & EPOLLPRI) {
+    result = cons(Val_int(caml_POLLPRI), result);
+  }
   if (events & EPOLLIN) {
     result = cons(Val_int(caml_POLLIN), result);
-  } else if (events & EPOLLPRI) {
-    result = cons(Val_int(caml_POLLPRI), result);
-  } else if (events & EPOLLOUT) {
-    result = cons(Val_int(caml_POLLOUT), result);
-  } else if (events & EPOLLERR) {
-    result = cons(Val_int(caml_POLLERR), result);
-  } else if (events & EPOLLHUP) {
-    result = cons(Val_int(caml_POLLHUP), result);
   }
   CAMLreturn(result);
 }
