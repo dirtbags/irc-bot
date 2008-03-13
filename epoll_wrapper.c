@@ -1,6 +1,6 @@
 /** OCaml poll() interface
  *
- * Time-stamp: <2008-03-11 17:44:00 neale>
+ * Time-stamp: <2008-03-12 23:20:54 neale>
  *
  * Copyright (C) 2008 Neale Pickett
  *
@@ -267,15 +267,11 @@ ocaml_epoll_wait(value t, value maxevents, value timeout)
  *
  ********************************************************************************/
 
-#warn "The poll() compatibility routines have not been tested, nay compiled."
-/* I just coded up how it more or less ought to go.  I haven't debugged
- * it at all.  I haven't even tried to compile it. */
-
 struct t {
   int            nfds;
   int            size;
   struct pollfd *fds;
-}
+};
 
 CAMLprim value
 ocaml_epoll_create(value size)
@@ -301,7 +297,7 @@ ocaml_epoll_destroy(value t)
 {
   CAMLparam1(t);
 
-  struct t *t_ = Field(t, 0);
+  struct t *t_ = (struct t *)Field(t, 0);
 
   free(t_->fds);
   free(t_);
@@ -314,7 +310,7 @@ ocaml_epoll_ctl(value t, value op, value what)
 {
   CAMLparam3(t, op, what);
 
-  struct t      *t_  = Field(t, 0);
+  struct t *t_ = (struct t *)Field(t, 0);
   int            op_ = Int_val(op);
   struct pollfd  pfd;
   int            i;
@@ -336,13 +332,13 @@ ocaml_epoll_ctl(value t, value op, value what)
       if (i < t_->nfds) {
         caml_failwith("file descriptor already present");
       }
-      if (i >= t->size) {
+      if (i >= t_->size) {
         struct pollfd *newfds;
         int            newsize;
 
         newsize = t_->size + 20;
-        new = (struct pollfd *)realloc(t_, (sizeof struct pollfd) * newsize);
-        if (! new) {
+        newfds = (struct pollfd *)realloc(t_, (sizeof(struct pollfd)) * newsize);
+        if (! newfds) {
           caml_failwith("out of memory");
         }
         t_->size = newsize;
@@ -353,7 +349,7 @@ ocaml_epoll_ctl(value t, value op, value what)
       break;
 
     case caml_POLL_MOD:
-      t_->fds[i] = pdf;
+      t_->fds[i] = pfd;
       break;
 
     case caml_POLL_DEL:
@@ -368,13 +364,15 @@ ocaml_epoll_ctl(value t, value op, value what)
   }
 }
 
+#include "obj.h"
+
 CAMLprim value
 ocaml_epoll_wait(value t, value maxevents, value timeout)
 {
-  CAMLparam3(t, maxevents, caml_timeout);
-  CAMLlocal2(result, l, v);
+  CAMLparam3(t, maxevents, timeout);
+  CAMLlocal2(result, v);
 
-  struct t *t_         = Field(t, 0);
+  struct t *t_         = (struct t *)Field(t, 0);
   int       maxevents_ = Int_val(maxevents);
   int       i;
   int       j;
@@ -389,27 +387,29 @@ ocaml_epoll_wait(value t, value maxevents, value timeout)
   }
 
   result = Val_int(0);
-  j = 0;
-  for (i=0; ((i < t_->nfds) && (i < maxevents_)); i += 1) {
-    struct pollfd *p = &(t_->fds[i]);
+  if (0 < ret) {
+    j = 0;
+    for (i = 0; ((i < t_->nfds) && (i < maxevents_)); i += 1) {
+      struct pollfd *p = &(t_->fds[i]);
 
-    if (p->revents & POLLNVAL) {
-      /* Don't let j increment: remove this item */
-      continue;
-    } else if (p->revents) {
-      v = alloc_small(2, 0);
-      Field(v, 0) = Val_int(p->fd);
-      Field(v, 1) = event_list_of_int(p->revents);
-      result = cons(v, result);
+      if (p->revents & POLLNVAL) {
+        /* Don't let j increment: remove this item */
+        continue;
+      } else if (p->revents) {
+        v = alloc_small(2, 0);
+        Field(v, 0) = Val_int(p->fd);
+        Field(v, 1) = event_list_of_int(p->revents);
+        result = cons(v, result);
+      }
+      if (i != j) {
+        t_->fds[i] = t_->fds[j];
+      }
+      j += 1;
     }
-    if (i != j) {
-      t_->fds[i] = t_->fds[j];
-    }
-    j += i;
+    t_->nfds = j;
   }
-  t_->nfds = j;
-
   CAMLreturn(result);
+#error "I haven't yet figured out why this causes a segfault."
 }
 
 #endif

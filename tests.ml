@@ -42,33 +42,41 @@ let unit_tests =
 	(fun () ->
            let a,b = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
 	   let e = Epoll.create 1 in
-           let expect ?(n=3) what =
-             assert_equal
-               ~printer:epollfds_as_string
-               (List.sort compare what)
-               (List.sort compare (Epoll.wait e n 0))
-           in
 	     Epoll.ctl e Epoll.Add (a, [Epoll.Out; Epoll.In]);
-	     expect [(a, [Epoll.Out])];
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       [(a, [Epoll.Out])]
+	       (Epoll.wait e 1 0);
 
 	     Epoll.ctl e Epoll.Modify (a, [Epoll.In; Epoll.Priority]);
-             expect [];
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       []
+	       (Epoll.wait e 1 0);
 
 	     Epoll.ctl e Epoll.Add (b, [Epoll.Out; Epoll.In]);
-             expect [(b, [Epoll.Out])];
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       [(b, [Epoll.Out])]
+	       (Epoll.wait e 2 0);
 
 	     Epoll.ctl e Epoll.Modify (a, [Epoll.Out; Epoll.In]);
-             expect [(a, [Epoll.Out]); (b, [Epoll.Out])];
-             assert_equal
-               ~printer:string_of_int
-               1
-               (List.length (Epoll.wait e 1 0));
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       [(a, [Epoll.Out]); (b, [Epoll.Out])]
+	       (Epoll.wait e 2 0);
 
-             ignore(Unix.write a "arfbarf" 0 7);
-             expect [(a, [Epoll.Out]); (b, [Epoll.In; Epoll.Out])];
+	     Epoll.ctl e Epoll.Modify (a, [Epoll.Out; Epoll.In]);
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       [(b, [Epoll.Out])]
+	       (Epoll.wait e 1 0);
 
 	     Epoll.ctl e Epoll.Delete (a, []);
-	     expect [(b, [Epoll.In; Epoll.Out])];
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       [(b, [Epoll.Out])]
+	       (Epoll.wait e 2 0);
 	     assert_raises 
 	       (Failure "ocaml_epoll_ctl: No such file or directory")
 	       (fun () ->
@@ -77,59 +85,24 @@ let unit_tests =
 	       (Failure "ocaml_epoll_ctl: File exists")
 	       (fun () ->
 		  Epoll.ctl e Epoll.Add (b, [Epoll.In; Epoll.Priority]));
-             expect [(b, [Epoll.In; Epoll.Out])];
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       [(b, [Epoll.Out])]
+	       (Epoll.wait e 2 0);
 
 	     Unix.close b;
-             expect [];
+	     assert_equal
+	       ~printer:epollfds_as_string
+	       []
+	       (Epoll.wait e 2 0);
 	     assert_raises 
 	       (Failure "ocaml_epoll_ctl: Bad file descriptor")
 	       (fun () ->
 		  Epoll.ctl e Epoll.Modify (b, [Epoll.In; Epoll.Priority]));
 
-	     Unix.close a;
-	     Epoll.destroy e
+	     Epoll.destroy e;
+	     Unix.close a
 	);
-
-      "epoll accept" >::
-        (fun () ->
-           let fn = "/tmp/narfblatt" in
-           let _ =
-             try
-               Unix.unlink fn
-             with _ ->
-               ()
-           in
-           let addr = Unix.ADDR_UNIX fn in
-           let e = Epoll.create 3 in
-           let s = Unix.socket Unix.PF_UNIX Unix.SOCK_STREAM 0 in
-           let cli = Unix.socket Unix.PF_UNIX Unix.SOCK_STREAM 0 in
-           let expect what =
-             assert_equal
-               ~printer:epollfds_as_string
-               (List.sort compare what)
-               (List.sort compare (Epoll.wait e 3 0))
-           in
-             Unix.bind s addr;
-             Unix.listen s 4;
-             Epoll.ctl e Epoll.Add (s, [Epoll.In]);
-             expect [];
-
-             Unix.connect cli addr;
-             expect [(s, [Epoll.In])];
-
-             let srv, srv_addr = Unix.accept s in
-               Epoll.ctl e Epoll.Add (cli, [Epoll.In; Epoll.Out]);
-               Epoll.ctl e Epoll.Add (srv, [Epoll.In; Epoll.Out]);
-               expect [(cli, [Epoll.Out]); (srv, [Epoll.Out])];
-
-               ignore(Unix.single_write srv "Hello" 0 5);
-               expect [(cli, [Epoll.In; Epoll.Out]); (srv, [Epoll.Out])];
-
-               Unix.close cli;
-               Unix.close srv;
-               Unix.close s;
-               Epoll.destroy e;
-        );
 
       "command_of_string" >:: 
 	(fun () ->
