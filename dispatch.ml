@@ -89,7 +89,7 @@ let rec dispatch_timeouts d now =
       dispatch_timeouts d now
     end
 
-let rec dispatch_events d events_list =
+let rec dispatch_results d events_list =
   match events_list with
     | [] ->
 	()
@@ -97,7 +97,7 @@ let rec dispatch_events d events_list =
 	let handler = Fd_map.find fd !d.fds in
 	let events = events_of_epoll_events in
 	  handler d fd events;
-	  dispatch_events d tl
+	  dispatch_results d tl
 
 let once d =
   let now = Unix.time () in
@@ -111,7 +111,7 @@ let once d =
   in
   let result = Epoll.wait d.e !d.nfds timeout in
     dispatch_timeouts d (Unix.time ());
-    dispatch_events d result
+    dispatch_results d result
 
 let rec run d =    
   if ((!d.fds == Fd_map.empty) &&
