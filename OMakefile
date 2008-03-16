@@ -26,7 +26,7 @@ section
     dispatch_tests.cmo:
     dispatch_tests$(EXT_OBJ):
 
-    OCamlProgram(tests, tests dispatch_tests dispatch chat irc command iobuf client channel)
+    OCamlProgram(tests, tests dispatch chat irc command iobuf client channel)
 
 .PHONY: test
 test: tests
