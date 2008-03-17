@@ -22,7 +22,7 @@ val add : t -> Unix.file_descr -> fd_handler -> event list -> unit
     descriptor [fd], calling [handler] when an event occurs. *)
 
 val modify : t -> Unix.file_descr -> event list -> unit
-(** [modify d fd events] changes the events to listen for on fd *)
+(** [modify d fd events] changes the events to pay attention to on [fd] *)
 
 val set_handler : t -> Unix.file_descr -> fd_handler -> unit
 (** [set_handler d fd handler] changes the handler to be invoked for
@@ -32,7 +32,7 @@ val delete : t -> Unix.file_descr -> unit
 (** [delete d fd] stops [d] paying attention to events on file
     descriptor [fd] *)
 
-val add_timer : t -> float -> timer_handler -> unit
+val add_timer : t -> timer_handler -> float -> unit
 (** [add_timer d time handler] will cause dispatcher [d] to invoke
     [handler d time] at or after [time] *)
 

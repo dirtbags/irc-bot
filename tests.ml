@@ -1,9 +1,19 @@
 open Unixqueue
 open OUnit
-open Chat
 open Irc
 
-let ues = Unixqueue.create_unix_event_system ()
+(* Return true iff str starts with substr *)
+let startswith str substr =
+  let l = String.length substr in
+    if l > String.length str then
+      false
+    else
+      String.sub str 0 l = substr
+
+
+(* ***************************************************
+ * Epoll stuff
+ * ***************************************************)
 
 let int_of_file_descr fd = (Obj.magic fd) + 0
 
@@ -35,12 +45,114 @@ let rec epollfds_as_list pfds =
 let epollfds_as_string pfds =
   "[" ^ (String.concat ", " (epollfds_as_list pfds)) ^ "]"
 
+let epollfd_as_string pfd =
+  epollfds_as_string [pfd]
+
 let epoll_expect e ?(n=3) l =
   let m = Epoll.wait e n 0 in
   assert_equal
     ~printer:epollfds_as_string
     (List.sort compare l)
     (List.sort compare m)
+
+
+(* ***************************************************
+ * Chat script stuff
+ * ***************************************************)
+type chat_event =
+  | Send of string
+  | Recv of string
+  | Regex of string
+
+exception Chat_match of (string * chat_event)
+exception Chat_timeout of chat_event
+
+(* Return a [Dispatch.fd_handler] function to run script [s] *)
+let chat d fd s =
+  let script = ref s in
+  let timer = (Unix.time ()) +. 1.0 in
+  let obuf = Buffer.create 4096 in
+  let ibuf = Buffer.create 4096 in
+  let handle_timer _ =
+    raise (Chat_timeout (List.hd !script))
+  in
+  let rec run_script fd =
+    match !script with
+      | [] ->
+          Dispatch.delete_timer d timer;
+          Dispatch.delete d fd;
+          Unix.close fd
+      | Send buf :: tl ->
+          Buffer.add_string obuf buf;
+          script := tl;
+          run_script fd
+      | Recv buf :: tl ->
+          let buf_len = String.length buf in
+          let ibuf_str = Buffer.contents ibuf in
+            if (Buffer.length ibuf >= buf_len) then
+              if startswith ibuf_str buf then
+                begin
+                  script := tl;
+                  Buffer.clear ibuf;
+                  Buffer.add_substring
+                    ibuf
+                    ibuf_str
+                    buf_len
+                    ((String.length ibuf_str) - buf_len);
+                  run_script fd
+                end
+              else
+                raise (Chat_match (ibuf_str, Recv buf))
+            else
+              ()
+      | Regex buf :: tl ->
+          let ibuf_str = Buffer.contents ibuf in
+          let matched = Str.string_match (Str.regexp buf) ibuf_str 0 in
+            if (Buffer.length ibuf > 0) then
+              if matched then
+                let match_len = Str.match_end () in
+                  script := tl;
+                  Buffer.clear ibuf;
+                  Buffer.add_substring
+                    ibuf
+                    ibuf_str
+                    match_len
+                    ((String.length ibuf_str) - match_len);
+                  run_script fd
+              else
+                raise (Chat_match (ibuf_str, Regex buf))
+            else
+              ()
+  in
+  let rec handler fd events =
+    match events with
+      | [] ->
+          ()
+      | Dispatch.Input :: tl ->
+          let s = String.create 4096 in
+          let n = Unix.read fd s 0 4096 in
+            Buffer.add_substring ibuf s 0 n;
+            run_script fd
+      | Dispatch.Output :: tl ->
+          if ((Buffer.length obuf) = 0) then
+            Dispatch.modify d fd [Dispatch.Input]
+          else
+            let ostr = Buffer.contents obuf in
+            let olen = Buffer.length obuf in
+            let n = Unix.write fd ostr 0 olen in
+              Buffer.clear obuf;
+              Buffer.add_substring obuf ostr n (olen - n)
+      | _ ->
+          failwith "Unexpected event"
+  in
+    Dispatch.add_timer d handle_timer timer;
+    Dispatch.add d fd handler [Dispatch.Input];
+    run_script fd
+      
+
+(* ***************************************************
+ * The tests
+ * ***************************************************)
 
 let unit_tests =
   "Unit tests" >::: [
@@ -99,27 +211,37 @@ let unit_tests =
       (fun () ->
          let d = Dispatch.create 3 in
          let a,b = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
+
+         let last_event = ref (a, []) in
          let rec handle fd events =
-           match events with
-             | [Dispatch.Input; Dispatch.Output] ->
-                 let s = String.create 4096 in
-                 let n = Unix.read fd s 0 4096 in
-                   assert_equal
-                     n
-                     (Unix.write fd s 0 n)
-             | _ ->
-                 ()
+           last_event := (fd, events)
          in
-           assert_equal 2 (Unix.write a "hi" 0 2);
+
+         let last_timer = ref 0.0 in
+         let handle_timer time =
+           last_timer := time
+         in
+
+           assert_equal 8 (Unix.write a "dispatch" 0 8);
            Dispatch.add d b handle [Dispatch.Input; Dispatch.Output];
            Dispatch.once d;
-           let s = String.create 4096 in
-             assert_equal 2 (Unix.read a s 0 4096);
-             assert_equal "hi" (Str.string_before s 2);
+           assert_equal (b, [Dispatch.Input; Dispatch.Output]) !last_event;
+           (let s = String.create 4096 in
+              assert_equal 8 (Unix.read b s 0 4096);
+              assert_equal "dispatch" (Str.string_before s 8));
 
-             Dispatch.destroy d;
-             Unix.close a;
-             Unix.close b
+           (let time = ((Unix.time ()) +. 0.1) in
+              Dispatch.add_timer d handle_timer time;
+              assert_equal 0.0 !last_timer;
+              Dispatch.once d;
+              assert_equal time !last_timer);
+
+           Dispatch.once d;
+           assert_equal (b, [Dispatch.Output]) !last_event;
+
+           Dispatch.destroy d;
+           Unix.close a;
+           Unix.close b
       );
 
       "command_of_string" >:: 
@@ -141,11 +263,25 @@ let unit_tests =
              (Command.create (Some "foo.bar") "PART" ["#foo"; "#bar"]
                 (Some "ta ta"))
              (Command.from_string ":foo.bar PART #foo #bar :ta ta");
-        )
+        );
+
+      "Chat test" >::
+        (fun () ->
+           let d = Dispatch.create 3 in
+           let a,b = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
+             chat d a
+               [Send "banner";
+                Recv "hi";
+                Send "ehlo there, pleased to meet you"];
+             chat d b
+               [Recv "banner"; 
+                Send "hi"; 
+                Regex "ehlo .* you"];
+             Dispatch.run d;
+        );
     ]
-      
 
-
+(*
 let do_login nick =
   [
     Send ("USER " ^ nick ^ " +iw " ^ nick ^ " :gecos\r\n");
@@ -241,9 +377,10 @@ let regression_tests =
              ignore (new chat_handler script2 ues bb);
              chat_run ues);
     ]
+*)
 
 let _ =
   Irc.name := "testserver.test";
-  run_test_tt_main (TestList [unit_tests; regression_tests])
+  run_test_tt_main (TestList [unit_tests (*; regression_tests *)])
 	
   

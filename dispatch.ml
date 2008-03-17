@@ -70,7 +70,7 @@ let delete d fd =
   d.fds := Fd_map.remove fd !(d.fds);
   d.numfds := !(d.numfds) - 1
 
-let add_timer d time handler =
+let add_timer d handler time =
   d.timers := Timer.add (time, handler) !(d.timers)
 
 let delete_timer d time =
