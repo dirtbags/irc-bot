@@ -2,6 +2,9 @@ open Unixqueue
 open OUnit
 open Irc
 
+let dump x =
+  Printf.ksprintf (fun str -> prerr_string str; flush stderr) x
+
 (* Return true iff str starts with substr *)
 let startswith str substr =
   let l = String.length substr in
@@ -67,43 +70,65 @@ type chat_event =
 exception Chat_match of (string * chat_event)
 exception Chat_timeout of chat_event
 
+let string_of_chat_event e =
+  match e with
+    | Send str ->
+        ("Send (\"" ^ (String.escaped str) ^ "\")")
+    | Recv str ->
+        ("Recv (\"" ^ (String.escaped str) ^ "\")")
+    | Regex str ->
+        ("Regex (\"" ^ (String.escaped str) ^ "\")")
+
 (* Return a [Dispatch.fd_handler] function to run script [s] *)
 let chat d fd s =
   let script = ref s in
-  let timer = (Unix.time ()) +. 1.0 in
+    (* Add some amount, dependent on fd, to the timeout value, so peers won't obliterate it *)
+  let timer = (Unix.time ()) +. 1.0 +. (0.01 *. (float_of_int (int_of_file_descr fd))) in
   let obuf = Buffer.create 4096 in
   let ibuf = Buffer.create 4096 in
   let handle_timer _ =
-    raise (Chat_timeout (List.hd !script))
+    failwith (Printf.sprintf "fd=%d timeout waiting for %s" 
+		(int_of_file_descr fd)
+		(string_of_chat_event (List.hd !script)))
+  in
+  let nomatch got =
+    failwith (Printf.sprintf "fd=%d expecting %s\n got %s"
+		(int_of_file_descr fd)
+		(string_of_chat_event (List.hd !script))
+		(String.escaped got))
   in
   let rec run_script fd =
     match !script with
       | [] ->
-          Dispatch.delete_timer d timer;
-          Dispatch.delete d fd;
-          Unix.close fd
+	  if ((Buffer.length obuf) = 0) then begin
+            Dispatch.delete_timer d timer;
+	    (try
+	       Dispatch.delete d fd
+	     with (Failure _) ->
+	       ());
+            Unix.close fd
+	  end
       | Send buf :: tl ->
           Buffer.add_string obuf buf;
+	  Dispatch.modify d fd [Dispatch.Input; Dispatch.Output];
           script := tl;
           run_script fd
       | Recv buf :: tl ->
           let buf_len = String.length buf in
           let ibuf_str = Buffer.contents ibuf in
-            if (Buffer.length ibuf >= buf_len) then
-              if startswith ibuf_str buf then
-                begin
-                  script := tl;
-                  Buffer.clear ibuf;
-                  Buffer.add_substring
-                    ibuf
-                    ibuf_str
-                    buf_len
-                    ((String.length ibuf_str) - buf_len);
-                  run_script fd
-                end
-              else
-                raise (Chat_match (ibuf_str, Recv buf))
-            else
+            if ((Buffer.length ibuf) >= buf_len) then begin
+              if startswith ibuf_str buf then begin
+                script := tl;
+                Buffer.clear ibuf;
+                Buffer.add_substring
+                  ibuf
+                  ibuf_str
+                  buf_len
+                  ((String.length ibuf_str) - buf_len);
+                run_script fd
+              end else
+		nomatch ibuf_str
+	    end else
               ()
       | Regex buf :: tl ->
           let ibuf_str = Buffer.contents ibuf in
@@ -120,9 +145,10 @@ let chat d fd s =
                     ((String.length ibuf_str) - match_len);
                   run_script fd
               else
-                raise (Chat_match (ibuf_str, Regex buf))
+		nomatch ibuf_str
             else
               ()
+
   in
   let rec handler fd events =
     match events with
@@ -132,16 +158,26 @@ let chat d fd s =
           let s = String.create 4096 in
           let n = Unix.read fd s 0 4096 in
             Buffer.add_substring ibuf s 0 n;
-            run_script fd
+            run_script fd;
+	    handler fd tl
       | Dispatch.Output :: tl ->
-          if ((Buffer.length obuf) = 0) then
-            Dispatch.modify d fd [Dispatch.Input]
-          else
-            let ostr = Buffer.contents obuf in
-            let olen = Buffer.length obuf in
-            let n = Unix.write fd ostr 0 olen in
-              Buffer.clear obuf;
-              Buffer.add_substring obuf ostr n (olen - n)
+	  begin
+            if ((Buffer.length obuf) = 0) then
+              Dispatch.modify d fd [Dispatch.Input]
+            else
+              let ostr = Buffer.contents obuf in
+              let olen = Buffer.length obuf in
+              let n = Unix.write fd ostr 0 olen in
+		Buffer.clear obuf;
+		Buffer.add_substring obuf ostr n (olen - n)
+	  end;
+	  handler fd tl
+      | Dispatch.Hangup :: tl ->
+	  (* Stop listening to this fd, it will always return Hangup *)
+	  (try
+	     Dispatch.delete d fd
+	   with (Failure _) ->
+	     ())
       | _ ->
           failwith "Unexpected event"
   in
@@ -222,19 +258,36 @@ let unit_tests =
            last_timer := time
          in
 
+	 let s = String.create 4096 in
+
            assert_equal 8 (Unix.write a "dispatch" 0 8);
            Dispatch.add d b handle [Dispatch.Input; Dispatch.Output];
            Dispatch.once d;
            assert_equal (b, [Dispatch.Input; Dispatch.Output]) !last_event;
-           (let s = String.create 4096 in
-              assert_equal 8 (Unix.read b s 0 4096);
-              assert_equal "dispatch" (Str.string_before s 8));
+           assert_equal 8 (Unix.read b s 0 4096);
+           assert_equal "dispatch" (Str.string_before s 8);
 
-           (let time = ((Unix.time ()) +. 0.1) in
+           (let time = ((Unix.gettimeofday ()) +. 0.01) in
               Dispatch.add_timer d handle_timer time;
-              assert_equal 0.0 !last_timer;
+              Dispatch.add_timer d handle_timer ((Unix.gettimeofday ()) +. 10.0);
+
+              assert_equal ~printer:string_of_float 0.0 !last_timer;
               Dispatch.once d;
-              assert_equal time !last_timer);
+              assert_equal ~printer:string_of_float 0.0 !last_timer;
+
+	      Dispatch.modify d b [Dispatch.Input];
+	      while !last_timer = 0.0 do
+		Dispatch.once d
+	      done;
+              assert_equal ~printer:string_of_float time !last_timer;
+
+	      Dispatch.modify d b [Dispatch.Input; Dispatch.Output];
+	      assert_equal 6 (Unix.write a "gnarly" 0 6);
+              Dispatch.once d;
+              assert_equal (b, [Dispatch.Input; Dispatch.Output]) !last_event;
+              assert_equal 6 (Unix.read b s 0 4096);
+
+              assert_equal ~printer:string_of_float time !last_timer);
 
            Dispatch.once d;
            assert_equal (b, [Dispatch.Output]) !last_event;

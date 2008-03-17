@@ -5,7 +5,7 @@ type fd_handler = Unix.file_descr -> event list -> unit
 module Timer =
   Set.Make (struct
               type t = (float * timer_handler)
-              let compare = compare
+              let compare (time, handler) (time', handler') = compare time time'
             end)
 
 module Fd_map =
@@ -20,7 +20,6 @@ type t = {
   numfds : int ref;
   timers : Timer.t ref;
 }
-
 
 let to_epoll = function
   | Input -> Epoll.In
@@ -83,7 +82,7 @@ let delete_timer d time =
 let rec dispatch_timers d now =
   if (!(d.timers) != Timer.empty) then
     let (time, handler) = Timer.min_elt !(d.timers) in
-      if now > time then
+      if now < time then
         ()
       else begin
         handler time;
@@ -102,19 +101,25 @@ let rec dispatch_results d events_list =
           dispatch_results d tl
 
 let once d =
-  let now = Unix.time () in
+  let now = Unix.gettimeofday () in
   let timeout =
     try
       let (time, _) = Timer.min_elt !(d.timers) in
-      let timeout_s = max (time -. now) 0.0 in
-        int_of_float (timeout_s *. 1000.0)
+      let delta = (time -. now) in
+	max delta 0.0
     with Not_found ->
-      -1
+      (-1.0)
   in
-  let result = Epoll.wait d.e !(d.numfds) timeout in
-    dispatch_timers d (Unix.time ());
-    dispatch_results d result
-
+    (if !(d.numfds) = 0 then
+       (* epoll()--and probably poll()--barfs if it has no file descriptors *)
+       ignore (Unix.select [] [] [] timeout)
+     else
+       (* poll() and epoll() wait *at most* timeout ms.  If you have fds but they're not
+	  doing anything, multiple calls to once may be required.  This is lame. *)
+       let timeout_ms = int_of_float (timeout *. 1000.0) in
+       let result = Epoll.wait d.e !(d.numfds) timeout_ms in
+	 dispatch_results d result);
+    dispatch_timers d (Unix.gettimeofday ())
 
 let rec run d =    
   if ((!(d.fds) == Fd_map.empty) &&
