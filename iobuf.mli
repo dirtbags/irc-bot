@@ -1,8 +1,11 @@
 type t
 
-val addr : t -> string
+type command_handler = t -> Command.t -> unit
+type error_handler = t -> string -> unit
 
-val write : t -> Command.t -> unit
-val bind : Dispatch.t -> Unix.file_descr -> (t -> Command.t -> unit) -> (string -> unit) -> unit
-val rebind: t -> (t -> Command.t -> unit) -> (string -> unit) -> unit
+val create : Dispatch.t -> Unix.file_descr -> Unix.sockaddr -> command_handler -> error_handler -> unit
 val close: t -> string -> unit
+
+val addr : t -> string
+val write : t -> Command.t -> unit
+val bind : t -> command_handler -> error_handler -> unit

@@ -30,17 +30,16 @@ let uhost cli =
 let close cli =
   Iobuf.close cli.iobuf
 
-let write cli cmd =
+let write_command cli cmd =
   Iobuf.write cli.iobuf cmd
 
-let reply cli num ?(args=[]) text =
-  write cli (Command.create 
-               (Some !(Irc.name))
-               num
-               ([!(cli.nick)] @ args)
-               (Some text))
+let write cli sender name args text =
+  write_command cli (Command.create sender name args text)
 
-let handle_close cli message =
+let reply cli num ?(args=[]) text =
+  write cli (Some !(Irc.name)) num ([!(cli.nick)] @ args) (Some text)
+
+let handle_error cli iobuf message =
   Hashtbl.remove by_nick !(cli.nick)
 
 let handle_command cli iobuf cmd =
@@ -51,8 +50,12 @@ let handle_command cli iobuf cmd =
         ()
     | (None, "SERVICE", [nickname; _; distribution; svctype; _], Some info) ->
         ()
-    | (None, "QUIT", [], message) ->
-        ()
+    | (None, "QUIT", [], None) ->
+        write cli (Some !(Irc.name)) "ERROR" [] (Some "So long");
+        Iobuf.close iobuf "No reason provided"
+    | (None, "QUIT", [], Some message) ->
+        write cli (Some !(Irc.name)) "ERROR" [] (Some "So long");
+        Iobuf.close iobuf message
     | (None, "JOIN", ["0"], None) ->
         ()
     | (None, "JOIN", [channels], None) ->
@@ -81,11 +84,7 @@ let handle_command cli iobuf cmd =
           begin
             try
               let peer = lookup target in
-                write peer (Command.create
-                              (Some (uhost cli))
-                              command
-                              [target]
-                              (Some text))
+                write peer (Some (uhost cli)) command [target] (Some text)
             with Not_found ->
               reply cli "401" ~args:[target] "No such nick/channel"
           end
@@ -131,7 +130,7 @@ let handle_command cli iobuf cmd =
         ()
     | (None, "PING", [], Some text)
     | (None, "PING", [text], None) ->
-        write cli (Command.create (Some !(Irc.name)) "PONG" [!(Irc.name)] (Some text))
+        write cli (Some !(Irc.name)) "PONG" [!(Irc.name)] (Some text)
     | (None, "PONG", [payload], None) ->
         ()
     | (None, "ERROR", [], Some message) ->
@@ -189,7 +188,7 @@ let rec handle_command_prereg (nick, username, realname, password) iobuf cmd =
                          " " ^ Irc.version ^
                          " " ^ modes ^
                          " " ^ Channel.modes);
-      Iobuf.rebind iobuf (handle_command cli) (handle_close cli)
+      Iobuf.bind iobuf (handle_command cli) (handle_error cli)
     with Error cmd ->
       Iobuf.write iobuf cmd
   in
@@ -209,10 +208,9 @@ let rec handle_command_prereg (nick, username, realname, password) iobuf cmd =
                  username = username;
                  realname = realname}
     | _ ->
-        Iobuf.rebind iobuf (handle_command_prereg acc) ignore
+        Iobuf.bind iobuf (handle_command_prereg acc) (fun _ _ -> ())
 
 let handle_connection d fd addr =
-  let command_handler = handle_command_prereg (None, None, None, None) in
-  let close_handler = ignore in
-    Iobuf.bind d fd command_handler close_handler
+  let handle_command = handle_command_prereg (None, None, None, None) in
+    Iobuf.create d fd addr handle_command (fun _ _ -> ())
     

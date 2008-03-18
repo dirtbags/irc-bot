@@ -7,7 +7,7 @@ OCAMLCFLAGS += -g
 
 StaticCLibrary(ocamlepoll, epoll_wrapper)
 
-OCamlProgram(ircd, ircd irc command iobuf client channel)
+OCamlProgram(ircd, ircd irc command iobuf dispatch client channel)
 
 section
     OCAMLPACKS[] +=

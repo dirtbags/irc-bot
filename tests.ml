@@ -404,8 +404,8 @@ let regression_tests =
                  Send "ISON bob\r\n";
                  Recv ":testserver.test 303 alice :bob\r\n";
                  Send "PRIVMSG bob :Hi Bob!\r\n";
-                 Send "PING :foo\r\n";  (* Make sure we don't disconnect too soon *)
-                 Recv ":testserver.test PONG testserver.test :foo\r\n";
+                 Send "QUIT :foo\r\n";
+                 Recv ":testserver.test ERROR :So long\r\n";
                ]
            in
            let script2 =
@@ -414,6 +414,8 @@ let regression_tests =
                  Send "ISON alice\r\n";
                  Recv ":testserver.test 303 bob :alice\r\n";
                  Recv ":alice!alice@UDS PRIVMSG bob :Hi Bob!\r\n";
+                 Send "QUIT :foo\r\n";
+                 Recv ":testserver.test ERROR :So long\r\n";
                ]
            in
            let d = Dispatch.create 4 in
