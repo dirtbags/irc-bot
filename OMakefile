@@ -1,6 +1,4 @@
 OCAMLPACKS[] = 
-    equeue
-    pcre
     str
 OCAML_CLIBS = ocamlepoll
 OCAMLCFLAGS += -g
@@ -26,7 +24,7 @@ section
     dispatch_tests.cmo:
     dispatch_tests$(EXT_OBJ):
 
-    OCamlProgram(tests, tests dispatch chat irc command iobuf client channel)
+    OCamlProgram(tests, tests dispatch irc command iobuf client channel)
 
 .PHONY: test
 test: tests

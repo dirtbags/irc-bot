@@ -40,7 +40,7 @@ let reply cli num ?(args=[]) text =
                ([!(cli.nick)] @ args)
                (Some text))
 
-let handle_close cli () =
+let handle_close cli message =
   Hashtbl.remove by_nick !(cli.nick)
 
 let handle_command cli iobuf cmd =
@@ -161,22 +161,22 @@ let set_nick cli nick =
   Hashtbl.replace by_nick nick cli;
   cli.nick := nick
 
-let rec handle_command_prereg (nick', username', realname', password') iobuf cmd =
+let rec handle_command_prereg (nick, username, realname, password) iobuf cmd =
   (* Handle a command during the login phase *)
   let acc =
     match (Command.as_tuple cmd) with
-      | (None, "PASS", [password], None) ->
-          (nick', username', realname', Some password)
-      | (None, "USER", [username; _; _], Some realname) ->
-          (nick', Some username, Some (Irc.truncate realname 40), password')
-      | (None, "NICK", [nick], None) ->
-          (Some nick, username', realname', password')
+      | (None, "PASS", [password'], None) ->
+          (nick, username, realname, Some password')
+      | (None, "USER", [username'; _; _], Some realname') ->
+          (nick, Some username', Some (Irc.truncate realname' 40), password)
+      | (None, "NICK", [nick'], None) ->
+          (Some nick', username, realname, password)
       | _ ->
           Iobuf.write iobuf (Command.create
                                (Some !(Irc.name)) 
                                "451" ["*"] 
                                (Some "Register first."));
-          (nick', username', realname', password')
+          (nick, username, realname, password)
   in
   let welcome cli =
     try
@@ -211,8 +211,8 @@ let rec handle_command_prereg (nick', username', realname', password') iobuf cmd
     | _ ->
         Iobuf.rebind iobuf (handle_command_prereg acc) ignore
 
-let handle_connection ues grp fd =
+let handle_connection d fd addr =
   let command_handler = handle_command_prereg (None, None, None, None) in
   let close_handler = ignore in
-    Iobuf.bind ues grp fd command_handler close_handler
+    Iobuf.bind d fd command_handler close_handler
     

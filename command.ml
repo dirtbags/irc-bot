@@ -39,7 +39,7 @@ let extract_word s =
 let rec from_string line =
   (* Very simple.  Pull out words until you get one starting with ":".
      The very first word might start with ":", that doesn't count
-     because it's the sender.. *)
+     because it's the sender. *)
   let rec loop sender acc line =
     let c = (if (line = "") then None else (Some line.[0])) in
       match (c, acc) with

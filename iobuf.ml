@@ -1,8 +1,7 @@
-(* ==========================================
- * I/O buf stuff
- *)
-type t = {ues: Unixqueue.event_system;
-          grp: Unixqueue.group;
+(* **************************************
+ * IRC Command I/O buffers
+ * **************************************)
+type t = {d: Dispatch.t;
           fd: Unix.file_descr;
           outq: Command.t Queue.t;
           unsent: string ref;
@@ -10,13 +9,11 @@ type t = {ues: Unixqueue.event_system;
           ibuf_len: int ref;
           addr: string;
           command_handler: (t -> Command.t -> unit) ref;
-	  close_handler: (unit -> unit) ref}
+	  close_handler: (string -> unit) ref}
 
 let ibuf_max = 4096
 let max_outq = 50
 let obuf_max = 4096
-
-let by_file_descr = Hashtbl.create 25
 
 let addr iobuf = iobuf.addr
 
@@ -24,25 +21,12 @@ let write iobuf cmd =
   let was_empty = Queue.is_empty iobuf.outq in
     Queue.add cmd iobuf.outq;
     if (was_empty && (!(iobuf.unsent) = ""))  then
-      Unixqueue.add_resource
-        iobuf.ues iobuf.grp (Unixqueue.Wait_out iobuf.fd, -.1.0)
+      Dispatch.modify iobuf.d iobuf.fd [Dispatch.Input; Dispatch.Output]
 
-let close iobuf =
-  !(iobuf.close_handler) ();
-  Hashtbl.remove by_file_descr iobuf.fd;
-  Unix.close iobuf.fd;
-  Unixqueue.remove_resource iobuf.ues iobuf.grp (Unixqueue.Wait_in iobuf.fd);
-  try
-    Unixqueue.remove_resource iobuf.ues iobuf.grp (Unixqueue.Wait_out iobuf.fd);
-  with Not_found ->
-    ()
-
-let handle_close fd =
-  try
-    let iobuf = Hashtbl.find by_file_descr fd in
-      close iobuf
-  with Not_found ->
-    ()
+let close iobuf message =
+  !(iobuf.close_handler) message;
+  Dispatch.delete iobuf.d iobuf.fd;
+  Unix.close iobuf.fd
 
 let crlf = Str.regexp "\r?\n"
 
@@ -63,27 +47,22 @@ let handle_input iobuf =
   in
     loop lines
 
-let handle_event ues esys e =
-  match e with
-    | Unixqueue.Input_arrived (g, fd) ->
-        let iobuf = Hashtbl.find by_file_descr fd in
+let rec handle_events iobuf fd events =
+  match events with
+    | [] ->
+	()
+    | Dispatch.Input :: tl ->
         let size = ibuf_max - !(iobuf.ibuf_len) in
         let len = Unix.read fd iobuf.ibuf !(iobuf.ibuf_len) size in
-          if (len > 0) then
-            begin
-              iobuf.ibuf_len := !(iobuf.ibuf_len) + len;
-              try
-                handle_input iobuf
-              with Not_found ->
-                if (!(iobuf.ibuf_len) = ibuf_max) then
-                  (* No newline found, and the buffer is full *)
-                  raise (Failure "Buffer overrun");
-            end
-          else
-            close iobuf
-    | Unixqueue.Output_readiness (g, fd) ->
+          iobuf.ibuf_len := !(iobuf.ibuf_len) + len;
+          handle_input iobuf;
+          if (!(iobuf.ibuf_len) = ibuf_max) then
+            (* No newline found, and the buffer is full *)
+	    close iobuf "Input buffer overrun"
+	  else
+	    handle_events iobuf fd tl
+    | Dispatch.Output :: tl ->
         (* XXX: Could be optimized to try and fill the output buffer *)
-        let iobuf = Hashtbl.find by_file_descr fd in
         let buf =
           if (!(iobuf.unsent) = "") then
             let cmd = Queue.pop iobuf.outq in
@@ -96,17 +75,19 @@ let handle_event ues esys e =
 	  if n < buflen then
             iobuf.unsent := Str.string_after buf n
 	  else if Queue.is_empty iobuf.outq then
-	    Unixqueue.remove_resource ues g (Unixqueue.Wait_out fd)
-    | Unixqueue.Out_of_band (g, fd) ->
-        print_endline "oob"
-    | Unixqueue.Timeout (g, op) ->
-        print_endline "timeout"
-    | Unixqueue.Signal ->
-        print_endline "signal"
-    | Unixqueue.Extra exn ->
-        print_endline "extra"
+	    Dispatch.modify iobuf.d fd [Dispatch.Input];
+	  handle_events iobuf fd tl
+    | Dispatch.Priority :: tl ->
+	let s = String.create 4096 in
+	  ignore (Unix.recv fd s 0 4096 [Unix.MSG_OOB]);
+	  handle_events iobuf fd tl
+    | Dispatch.Error :: tl ->
+	close iobuf "Error"
+    | Dispatch.Hangup :: tl ->
+	close iobuf "Hangup"
 
-let bind ues grp fd command_handler close_handler =
+
+let bind d fd command_handler close_handler =
   let (outq, unsent, ibuf, ibuf_len) =
     (Queue.create (), ref "", String.create ibuf_max, ref 0)
   in
@@ -117,8 +98,7 @@ let bind ues grp fd command_handler close_handler =
       | Unix.ADDR_INET (addr, port) ->
           Unix.string_of_inet_addr addr
   in
-  let iobuf = {ues = ues;
-               grp = grp;
+  let iobuf = {d = d;
                fd = fd;
                outq = outq;
                unsent = unsent;
@@ -128,9 +108,7 @@ let bind ues grp fd command_handler close_handler =
                command_handler = ref command_handler;
 	       close_handler = ref close_handler}
   in
-    Hashtbl.replace by_file_descr fd iobuf;
-    Unixqueue.add_resource ues grp (Unixqueue.Wait_in fd, -.1.0);
-    Unixqueue.add_close_action ues grp (fd, handle_close)
+    Dispatch.add d fd (handle_events iobuf) [Dispatch.Input]
 
 let rebind t command_handler close_handler =
   t.command_handler := command_handler;

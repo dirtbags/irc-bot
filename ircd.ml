@@ -7,32 +7,34 @@ let dbg msg a =
     [connection_handler] will be called with the file descriptor of
     any new connections.
 *)
-let establish_server ues connection_handler addr =
-  let g = Unixqueue.new_group ues in
-  let handle_event ues esys e =
-    match e with
-      | Unixqueue.Input_arrived (g, fd) ->
+let establish_server d connection_handler addr =
+  let rec handle_event fd events =
+    match events with
+      | [] ->
+	  ()
+      | Dispatch.Input :: tl ->
 	  let cli_fd, cli_addr = Unix.accept fd in
-	    connection_handler cli_fd
-      | _ ->
-	  raise Equeue.Reject
+	    connection_handler cli_fd cli_addr;
+	    handle_event fd tl
+      | Dispatch.Hangup :: tl ->
+	  Dispatch.delete d fd;
+	  handle_event fd tl
+      | _ :: tl ->
+	  handle_event fd tl
   in
   let srv = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
     Unix.bind srv addr;
     Unix.listen srv 50;
     Unix.setsockopt srv Unix.SO_REUSEADDR true;
-    Unixqueue.add_handler ues g handle_event;
-    Unixqueue.add_resource ues g (Unixqueue.Wait_in srv, -.1.0)
+    Dispatch.add d fd handle_event [Dispatch.Input];
 
 let main () =
-  let ues = Unixqueue.create_unix_event_system () in
-  let g = Unixqueue.new_group ues in
-    Unixqueue.add_handler ues g Iobuf.handle_event;
+  let d = Dispatch.create 50 in
     establish_server
       ues
-      Client.handle_connection
-      (Unix.ADDR_INET (Unix.inet_addr_any, 7777));
-    ues#run ()
+      (Client.handle_connection d)
+      (Unix.ADDR_INET (Unix.inet_addr_any, 6667));
+    Dispatch.run d
 
 let _ =
   main ()

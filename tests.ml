@@ -1,6 +1,4 @@
-open Unixqueue
 open OUnit
-open Irc
 
 let dump x =
   Printf.ksprintf (fun str -> prerr_string str; flush stderr) x
@@ -88,29 +86,29 @@ let chat d fd s =
   let ibuf = Buffer.create 4096 in
   let handle_timer _ =
     failwith (Printf.sprintf "fd=%d timeout waiting for %s" 
-		(int_of_file_descr fd)
-		(string_of_chat_event (List.hd !script)))
+                (int_of_file_descr fd)
+                (string_of_chat_event (List.hd !script)))
   in
   let nomatch got =
     failwith (Printf.sprintf "fd=%d expecting %s\n got %s"
-		(int_of_file_descr fd)
-		(string_of_chat_event (List.hd !script))
-		(String.escaped got))
+                (int_of_file_descr fd)
+                (string_of_chat_event (List.hd !script))
+                (String.escaped got))
   in
   let rec run_script fd =
     match !script with
       | [] ->
-	  if ((Buffer.length obuf) = 0) then begin
+          if ((Buffer.length obuf) = 0) then begin
             Dispatch.delete_timer d timer;
-	    (try
-	       Dispatch.delete d fd
-	     with (Failure _) ->
-	       ());
+            (try
+               Dispatch.delete d fd
+             with (Failure _) ->
+               ());
             Unix.close fd
-	  end
+          end
       | Send buf :: tl ->
           Buffer.add_string obuf buf;
-	  Dispatch.modify d fd [Dispatch.Input; Dispatch.Output];
+          Dispatch.modify d fd [Dispatch.Input; Dispatch.Output];
           script := tl;
           run_script fd
       | Recv buf :: tl ->
@@ -127,8 +125,8 @@ let chat d fd s =
                   ((String.length ibuf_str) - buf_len);
                 run_script fd
               end else
-		nomatch ibuf_str
-	    end else
+                nomatch ibuf_str
+            end else
               ()
       | Regex buf :: tl ->
           let ibuf_str = Buffer.contents ibuf in
@@ -145,7 +143,7 @@ let chat d fd s =
                     ((String.length ibuf_str) - match_len);
                   run_script fd
               else
-		nomatch ibuf_str
+                nomatch ibuf_str
             else
               ()
 
@@ -159,25 +157,25 @@ let chat d fd s =
           let n = Unix.read fd s 0 4096 in
             Buffer.add_substring ibuf s 0 n;
             run_script fd;
-	    handler fd tl
+            handler fd tl
       | Dispatch.Output :: tl ->
-	  begin
+          begin
             if ((Buffer.length obuf) = 0) then
               Dispatch.modify d fd [Dispatch.Input]
             else
               let ostr = Buffer.contents obuf in
               let olen = Buffer.length obuf in
               let n = Unix.write fd ostr 0 olen in
-		Buffer.clear obuf;
-		Buffer.add_substring obuf ostr n (olen - n)
-	  end;
-	  handler fd tl
+                Buffer.clear obuf;
+                Buffer.add_substring obuf ostr n (olen - n)
+          end;
+          handler fd tl
       | Dispatch.Hangup :: tl ->
-	  (* Stop listening to this fd, it will always return Hangup *)
-	  (try
-	     Dispatch.delete d fd
-	   with (Failure _) ->
-	     ())
+          (* Stop listening to this fd, it will always return Hangup *)
+          (try
+             Dispatch.delete d fd
+           with (Failure _) ->
+             ())
       | _ ->
           failwith "Unexpected event"
   in
@@ -258,7 +256,7 @@ let unit_tests =
            last_timer := time
          in
 
-	 let s = String.create 4096 in
+         let s = String.create 4096 in
 
            assert_equal 8 (Unix.write a "dispatch" 0 8);
            Dispatch.add d b handle [Dispatch.Input; Dispatch.Output];
@@ -275,15 +273,15 @@ let unit_tests =
               Dispatch.once d;
               assert_equal ~printer:string_of_float 0.0 !last_timer;
 
-	      Dispatch.modify d b [Dispatch.Input];
-	      Dispatch.once d;
-	      if (!last_timer = 0.0) then
-		(* Give it one chance *)
-		Dispatch.once d;
+              Dispatch.modify d b [Dispatch.Input];
+              Dispatch.once d;
+              if (!last_timer = 0.0) then
+                (* Give it one chance *)
+                Dispatch.once d;
               assert_equal ~printer:string_of_float time !last_timer;
 
-	      Dispatch.modify d b [Dispatch.Input; Dispatch.Output];
-	      assert_equal 6 (Unix.write a "gnarly" 0 6);
+              Dispatch.modify d b [Dispatch.Input; Dispatch.Output];
+              assert_equal 6 (Unix.write a "gnarly" 0 6);
               Dispatch.once d;
               assert_equal (b, [Dispatch.Input; Dispatch.Output]) !last_event;
               assert_equal 6 (Unix.read b s 0 4096);
@@ -335,7 +333,6 @@ let unit_tests =
         );
     ]
 
-(*
 let do_login nick =
   [
     Send ("USER " ^ nick ^ " +iw " ^ nick ^ " :gecos\r\n");
@@ -378,12 +375,11 @@ let regression_tests =
                  Recv ":testserver.test 401 nick otherguy :No such nick/channel\r\n";
                ]
            in
-           let g = Unixqueue.new_group ues in
+           let d = Dispatch.create 2 in
            let a,b = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
-             Unixqueue.add_handler ues g Iobuf.handle_event;
-             Client.handle_connection ues g a;
-             ignore (new chat_handler script ues b);
-             chat_run ues);
+             Client.handle_connection d a (Unix.getpeername a);
+             chat d b script;
+             Dispatch.run d);
 
       "Second connection" >::
         (fun () ->
@@ -394,12 +390,11 @@ let regression_tests =
                  Recv ":testserver.test 303 otherguy :otherguy\r\n";
                ]
            in
-           let g = Unixqueue.new_group ues in
+           let d = Dispatch.create 2 in
            let a,b = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
-             Unixqueue.add_handler ues g Iobuf.handle_event;
-             Client.handle_connection ues g a;
-             ignore (new chat_handler script ues b);
-             chat_run ues);
+             Client.handle_connection d a (Unix.getpeername a);
+             chat d b script;
+             Dispatch.run d);
 
       "Simultaneous connections" >::
         (fun () ->
@@ -421,20 +416,16 @@ let regression_tests =
                  Recv ":alice!alice@UDS PRIVMSG bob :Hi Bob!\r\n";
                ]
            in
-           let g = Unixqueue.new_group ues in
+           let d = Dispatch.create 4 in
            let aa,ab = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
            let ba,bb = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
-             Unixqueue.add_handler ues g Iobuf.handle_event;
-             Client.handle_connection ues g aa;
-             Client.handle_connection ues g ba;
-             ignore (new chat_handler script1 ues ab);
-             ignore (new chat_handler script2 ues bb);
-             chat_run ues);
+             Client.handle_connection d aa (Unix.getpeername aa);
+             Client.handle_connection d ba (Unix.getpeername ba);
+             chat d ab script1;
+             chat d bb script2;
+             Dispatch.run d);
     ]
-*)
 
 let _ =
   Irc.name := "testserver.test";
-  run_test_tt_main (TestList [unit_tests (*; regression_tests *)])
-	
-  
+  run_test_tt_main (TestList [unit_tests; regression_tests])

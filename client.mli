@@ -1,5 +1,5 @@
 type t
 
 val write : t -> Command.t -> unit
-val handle_connection : Unixqueue.event_system -> Unixqueue.group -> Unix.file_descr -> unit
+val handle_connection : Dispatch.t -> Unix.file_descr -> Unix.sockaddr -> unit
   
