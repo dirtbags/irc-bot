@@ -21,6 +21,14 @@ type t = {
   timers : Timer.t ref;
 }
 
+(* select(), poll(), and epoll() treat timeout as an upper bound of time
+   to wait.  This fudge factor helps ensure that given no FD activity,
+   this isn't run in a tight loop as a timer approaches.  This value was
+   determined experimentally on a 1.25GHz G4 PPC to work most of the
+   time.  Your mileage may vary. *)
+
+let timeout_fudge = 0.001
+
 let to_epoll = function
   | Input -> Epoll.In
   | Priority -> Epoll.Priority
@@ -105,7 +113,7 @@ let once d =
   let timeout =
     try
       let (time, _) = Timer.min_elt !(d.timers) in
-      let delta = (time -. now) in
+      let delta = (time -. now +. timeout_fudge) in
 	max delta 0.0
     with Not_found ->
       (-1.0)
@@ -129,5 +137,3 @@ let rec run d =
     once d;
     run d
   end
-
-        

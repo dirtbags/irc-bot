@@ -276,9 +276,10 @@ let unit_tests =
               assert_equal ~printer:string_of_float 0.0 !last_timer;
 
 	      Dispatch.modify d b [Dispatch.Input];
-	      while !last_timer = 0.0 do
-		Dispatch.once d
-	      done;
+	      Dispatch.once d;
+	      if (!last_timer = 0.0) then
+		(* Give it one chance *)
+		Dispatch.once d;
               assert_equal ~printer:string_of_float time !last_timer;
 
 	      Dispatch.modify d b [Dispatch.Input; Dispatch.Output];
