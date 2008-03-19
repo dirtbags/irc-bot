@@ -10,21 +10,21 @@ StaticCLibrary(ocamlepoll, epoll_wrapper)
 OCamlProgram(ircd, ircd irc command iobuf dispatch client channel)
 
 section
-    OCAMLPACKS[] +=
-        oUnit
-    NATIVE_ENABLED = false
+	OCAMLPACKS[] +=
+		oUnit
+	NATIVE_ENABLED = false
 
-    tests.cmx:
-    tests.cmi:
-    tests.cmo:
-    tests$(EXT_OBJ):
+	tests.cmx:
+	tests.cmi:
+	tests.cmo:
+	tests$(EXT_OBJ):
 
-    dispatch_tests.cmx:
-    dispatch_tests.cmi:
-    dispatch_tests.cmo:
-    dispatch_tests$(EXT_OBJ):
+	dispatch_tests.cmx:
+	dispatch_tests.cmi:
+	dispatch_tests.cmo:
+	dispatch_tests$(EXT_OBJ):
 
-    OCamlProgram(tests, tests dispatch irc command iobuf client channel)
+	OCamlProgram(tests, tests dispatch irc command iobuf client channel)
 
 .PHONY: test
 test: tests

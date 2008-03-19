@@ -1,12 +1,11 @@
 open Irc
 
-
-
 (* ==========================================
  * Client stuff
  *)
 type t = {iobuf: Iobuf.t;
           nick: string ref;
+          away: string option ref;
           username: string;
           realname: string}
 
@@ -113,7 +112,9 @@ let handle_command cli iobuf cmd =
     | (None, "ADMIN", [], None) ->
         ()
     | (None, "INFO", [], None) ->
-        ()
+        reply cli "371" (Printf.sprintf "pgircd v%s" Irc.version);
+        reply cli "371" (Printf.sprintf "Running since %f" Irc.start_time);
+        reply cli "374" "End of INFO list"
     | (None, "SERVLIST", [], None) ->
         ()
     | (None, "SQUERY", [servicename], Some text) ->
@@ -132,18 +133,17 @@ let handle_command cli iobuf cmd =
     | (None, "PING", [text], None) ->
         write cli (Some !(Irc.name)) "PONG" [!(Irc.name)] (Some text)
     | (None, "PONG", [payload], None) ->
+        (* We do nothing. *)
         ()
     | (None, "ERROR", [], Some message) ->
-        ()
+        write cli (Some !(Irc.name)) "NOTICE" [!(cli.nick)] (Some "Bummer.")
     | (None, "AWAY", [], None) ->
-        ()
+        cli.away := None;
+        reply cli "305" "You are no longer marked as being away"
     | (None, "AWAY", [], Some message) ->
-        ()
+        cli.away := Some message;
+        reply cli "306" "You have been marked as being away"
     | (None, "REHASH", [], None) ->
-        ()
-    | (None, "DIE", [], None) ->
-        ()
-    | (None, "RESTART", [], None) ->
         ()
     | (None, "WALLOPS", [], Some text) ->
         ()
@@ -183,7 +183,8 @@ let rec handle_command_prereg (nick, username, realname, password) iobuf cmd =
       reply cli "001" "Welcome to IRC.";
       reply cli "002" ("I am " ^ !(Irc.name) ^ 
                          " Running version " ^ Irc.version);
-      reply cli "003" "This server was created sometime";
+      reply cli "003" ("This server was created " ^ 
+                         (string_of_float Irc.start_time));
       reply cli "004" (!(Irc.name) ^
                          " " ^ Irc.version ^
                          " " ^ modes ^
@@ -196,6 +197,7 @@ let rec handle_command_prereg (nick, username, realname, password) iobuf cmd =
     | (Some nick, Some username, Some realname, None) ->
         welcome {iobuf = iobuf;
                  nick = ref nick;
+                 away = ref None;
                  username = username;
                  realname = realname}
     | (Some nick, Some username, Some realname, Some password) ->
@@ -205,6 +207,7 @@ let rec handle_command_prereg (nick, username, realname, password) iobuf cmd =
                              (Some "*** Authentication unimplemented"));
         welcome {iobuf = iobuf;
                  nick = ref nick;
+                 away = ref None;
                  username = username;
                  realname = realname}
     | _ ->

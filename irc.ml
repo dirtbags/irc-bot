@@ -1,5 +1,6 @@
 let name = ref "irc.test"
 let version = "0.1"
+let start_time = Unix.gettimeofday ()
 
 let dbg msg a =
   prerr_endline ("[" ^ msg ^ "]");

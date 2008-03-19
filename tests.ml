@@ -90,7 +90,7 @@ let chat d fd s =
                 (string_of_chat_event (List.hd !script)))
   in
   let nomatch got =
-    failwith (Printf.sprintf "fd=%d expecting %s\n got %s"
+    failwith (Printf.sprintf "fd=%d\nexpecting %s\n             got %s"
                 (int_of_file_descr fd)
                 (string_of_chat_event (List.hd !script))
                 (String.escaped got))
@@ -339,7 +339,7 @@ let do_login nick =
     Send ("NICK " ^ nick ^ "\r\n");
     Recv (":testserver.test 001 " ^ nick ^ " :Welcome to IRC.\r\n");
     Recv (":testserver.test 002 " ^ nick ^ " :I am testserver.test Running version " ^ Irc.version ^ "\r\n");
-    Recv (":testserver.test 003 " ^ nick ^ " :This server was created sometime\r\n");
+    Recv (":testserver.test 003 " ^ nick ^ " :This server was created " ^ (string_of_float Irc.start_time) ^ "\r\n");
     Recv (":testserver.test 004 " ^ nick ^ " :testserver.test 0.1 l t\r\n");
   ]
 
@@ -363,6 +363,7 @@ let regression_tests =
                  Recv ":testserver.test PONG testserver.test :snot\r\n";
                  Send "PING :snot\r\n";
                  Recv ":testserver.test PONG testserver.test :snot\r\n";
+                 Send "PONG snot\r\n";
                  Send "ISON nick otherguy\r\n";
                  Recv ":testserver.test 303 nick :nick\r\n";
                  Send "ISON otherguy thirdguy\r\n";
@@ -373,6 +374,16 @@ let regression_tests =
                  Recv ":nick!nick@UDS NOTICE nick :hello\r\n";
                  Send "PRIVMSG otherguy :hello\r\n";
                  Recv ":testserver.test 401 nick otherguy :No such nick/channel\r\n";
+                 Send "AWAY :eating biscuits\r\n";
+                 Recv ":testserver.test 306 nick :You have been marked as being away\r\n";
+                 Send "AWAY\r\n";
+                 Recv ":testserver.test 305 nick :You are no longer marked as being away\r\n";
+                 Send "ERROR :I peed my pants\r\n";
+                 Recv ":testserver.test NOTICE nick :Bummer.\r\n";
+                 Send "INFO\r\n";
+                 Recv (":testserver.test 371 nick :pgircd v" ^ Irc.version ^ "\r\n");
+                 Recv (Printf.sprintf ":testserver.test 371 nick :Running since %f\r\n" Irc.start_time);
+                 Recv ":testserver.test 374 nick :End of INFO list\r\n";
                ]
            in
            let d = Dispatch.create 2 in
