@@ -1,3 +1,6 @@
+(** (Nickname, username, hostname) tuple *)
+type nuhost = (string * string * string)
+
 val name : string ref
 val version : string
 val start_time : float

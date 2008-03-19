@@ -340,7 +340,7 @@ let do_login nick =
     Recv (":testserver.test 001 " ^ nick ^ " :Welcome to IRC.\r\n");
     Recv (":testserver.test 002 " ^ nick ^ " :I am testserver.test Running version " ^ Irc.version ^ "\r\n");
     Recv (":testserver.test 003 " ^ nick ^ " :This server was created " ^ (string_of_float Irc.start_time) ^ "\r\n");
-    Recv (":testserver.test 004 " ^ nick ^ " :testserver.test 0.1 l t\r\n");
+    Recv (":testserver.test 004 " ^ nick ^ " :testserver.test 0.1 l aimnqpsrtklb\r\n");
   ]
 
 let regression_tests =

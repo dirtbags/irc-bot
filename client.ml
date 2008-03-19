@@ -26,8 +26,8 @@ let error num args text =
 let uhost cli =
   (!(cli.nick) ^ "!" ^ cli.username ^ "@" ^ (Iobuf.addr cli.iobuf))
 
-let close cli =
-  Iobuf.close cli.iobuf
+let kill cli message = 
+  Iobuf.close cli.iobuf ("Killed: " ^ message)
 
 let write_command cli cmd =
   Iobuf.write cli.iobuf cmd

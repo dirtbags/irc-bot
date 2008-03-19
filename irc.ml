@@ -1,3 +1,5 @@
+type nuhost = (string * string * string)
+
 let name = ref "irc.test"
 let version = "0.1"
 let start_time = Unix.gettimeofday ()
