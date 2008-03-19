@@ -10,7 +10,7 @@ type t = {d: Dispatch.t;
           addr: Unix.sockaddr;
           handle_command: command_handler ref;
           handle_error: error_handler ref;
-          valid: bool ref}
+          alive: bool ref}
 and command_handler = t -> Command.t -> unit
 and error_handler = t -> string -> unit
 
@@ -25,12 +25,6 @@ let addr iobuf =
         "UDS"
     | Unix.ADDR_INET (addr, port) ->
         Unix.string_of_inet_addr addr
-
-let write iobuf cmd =
-  let was_empty = Queue.is_empty iobuf.outq in
-    Queue.add cmd iobuf.outq;
-    if (was_empty && (!(iobuf.unsent) = ""))  then
-      Dispatch.modify iobuf.d iobuf.fd [Dispatch.Input; Dispatch.Output]
 
 let crlf = Str.regexp "\r?\n"
 
@@ -53,8 +47,17 @@ let handle_input iobuf =
 
 let close iobuf message =
   !(iobuf.handle_error) iobuf message;
-  iobuf.valid := false;
+  iobuf.alive := false;
   Dispatch.modify iobuf.d iobuf.fd [Dispatch.Input; Dispatch.Output]
+
+let write iobuf cmd =
+  match Queue.length iobuf.outq with
+    | a when a = max_outq ->
+      close iobuf "Max outq exceeded"
+    | len ->
+      Queue.add cmd iobuf.outq;
+      if ((len = 0) && (!(iobuf.unsent) = ""))  then
+        Dispatch.modify iobuf.d iobuf.fd [Dispatch.Input; Dispatch.Output]
 
 let rec handle_events iobuf fd events =
   match events with
@@ -71,28 +74,30 @@ let rec handle_events iobuf fd events =
 	  else
 	    handle_events iobuf fd tl
     | Dispatch.Output :: tl ->
-        (* XXX: Could be optimized to try and fill the output buffer *)
-        let buf =
-          if (!(iobuf.unsent) = "") then
+        let buf = Buffer.create obuf_max in
+          Buffer.add_string buf !(iobuf.unsent);
+          while (((Buffer.length buf) < obuf_max) &&
+                   (not (Queue.is_empty iobuf.outq))) do
             let cmd = Queue.pop iobuf.outq in
-              (Command.as_string cmd) ^ "\r\n"
-          else
-            !(iobuf.unsent)
-        in
-	let buflen = String.length buf in
-        let n = Unix.single_write fd buf 0 buflen in
-	  if n < buflen then begin
-            iobuf.unsent := Str.string_after buf n;
-	    handle_events iobuf fd tl
-          end else if Queue.is_empty iobuf.outq then
-            if !(iobuf.valid) then begin
-	      Dispatch.modify iobuf.d fd [Dispatch.Input];
+              Buffer.add_string buf (Command.as_string cmd);
+              Buffer.add_string buf "\r\n"
+          done;
+          let bufstr = Buffer.contents buf in
+	  let buflen = Buffer.length buf in
+          let n = Unix.single_write fd bufstr 0 buflen in
+	    if n < buflen then begin
+              iobuf.unsent := Str.string_after bufstr n;
 	      handle_events iobuf fd tl
-            end else begin
-              (* Close invalid connection after all output has despooled *)
-              Dispatch.delete iobuf.d iobuf.fd;
-              Unix.close iobuf.fd
-            end
+            end else if Queue.is_empty iobuf.outq then
+              if !(iobuf.alive) then begin
+                (* We're out of data to send *)
+	        Dispatch.modify iobuf.d fd [Dispatch.Input];
+	        handle_events iobuf fd tl
+              end else begin
+                (* Close dead connection after all output has despooled *)
+                Dispatch.delete iobuf.d iobuf.fd;
+                Unix.close iobuf.fd
+              end
     | Dispatch.Priority :: tl ->
 	let s = String.create 4096 in
 	  ignore (Unix.recv fd s 0 4096 [Unix.MSG_OOB]);
@@ -116,5 +121,5 @@ let create d fd addr handle_command handle_error =
                addr = addr;
                handle_command = ref handle_command;
                handle_error = ref handle_error;
-               valid = ref true} in
+               alive = ref true} in
     Dispatch.add d fd (handle_events iobuf) [Dispatch.Input]
