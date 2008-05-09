@@ -36,7 +36,7 @@ let write cli sender name args text =
   write_command cli (Command.create sender name args text)
 
 let reply cli num ?(args=[]) text =
-  write cli (Some !(Irc.name)) num ([!(cli.nick)] @ args) (Some text)
+  write cli (Some !(Irc.name)) num (!(cli.nick) :: args) (Some text)
 
 let handle_error cli iobuf message =
   Hashtbl.remove by_nick !(cli.nick)
@@ -58,7 +58,8 @@ let handle_command cli iobuf cmd =
     | (None, "JOIN", ["0"], None) ->
         ()
     | (None, "JOIN", [channels], None) ->
-        ()
+        let nuhost = (!(cli.nick), cli.username, (Iobuf.addr cli.iobuf)) in
+          Channel.handle_command cli.iobuf nuhost cmd
     | (None, "JOIN", [channels; keys], None) ->
         ()
     | (None, "PART", [channels], message) ->

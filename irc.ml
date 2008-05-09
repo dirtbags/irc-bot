@@ -40,3 +40,8 @@ let truncate s len =
       s
     else
       Str.string_before s (min slen len)
+
+let string_of_nuhost (nick, user, host) = nick ^ "!" ^ user ^ "@" ^ host
+let nick (nick, user, host) = nick
+let user (nick, user, host) = user
+let host (nick, user, host) = host

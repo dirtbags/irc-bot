@@ -26,7 +26,7 @@ let establish_server d connection_handler addr =
     Unix.bind srv addr;
     Unix.listen srv 50;
     Unix.setsockopt srv Unix.SO_REUSEADDR true;
-    Dispatch.add d fd handle_event [Dispatch.Input];
+    Dispatch.add d fd handle_event [Dispatch.Input]
 
 let main () =
   let d = Dispatch.create 50 in

@@ -414,7 +414,10 @@ let regression_tests =
                [
                  Send "ISON bob\r\n";
                  Recv ":testserver.test 303 alice :bob\r\n";
+                 Send "JOIN #foo\r\n"; 
+                 Recv ":alice!alice@UDS JOIN #foo\r\n";
                  Send "PRIVMSG bob :Hi Bob!\r\n";
+                 Recv ":bob!bob@UDS JOIN #foo\r\n";
                  Send "QUIT :foo\r\n";
                  Recv ":testserver.test ERROR :So long\r\n";
                ]
@@ -425,6 +428,8 @@ let regression_tests =
                  Send "ISON alice\r\n";
                  Recv ":testserver.test 303 bob :alice\r\n";
                  Recv ":alice!alice@UDS PRIVMSG bob :Hi Bob!\r\n";
+                 Send "JOIN #foo\r\n";
+                 Recv ":bob!bob@UDS JOIN #foo\r\n";
                  Send "QUIT :foo\r\n";
                  Recv ":testserver.test ERROR :So long\r\n";
                ]
