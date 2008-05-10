@@ -418,6 +418,8 @@ let regression_tests =
                  Recv ":alice!alice@UDS JOIN #foo\r\n";
                  Send "PRIVMSG bob :Hi Bob!\r\n";
                  Recv ":bob!bob@UDS JOIN #foo\r\n";
+                 Send "PRIVMSG #foo :hello bob\r\n";
+                 Recv ":bob!bob@UDS NOTICE #foo :hello alice\r\n";
                  Send "QUIT :foo\r\n";
                  Recv ":testserver.test ERROR :So long\r\n";
                ]
@@ -425,11 +427,17 @@ let regression_tests =
            let script2 =
              (do_login "bob") @
                [
-                 Send "ISON alice\r\n";
+                 Send "ISON alice charlie\r\n";
                  Recv ":testserver.test 303 bob :alice\r\n";
                  Recv ":alice!alice@UDS PRIVMSG bob :Hi Bob!\r\n";
+                 Send "PRIVMSG #foo :snot\r\n";
+                 Recv ":testserver.test 404 bob #foo :Cannot send to channel\r\n";
+                 Send "NOTICE #foo :snot\r\n";
+                 Recv ":testserver.test 404 bob #foo :Cannot send to channel\r\n";
                  Send "JOIN #foo\r\n";
                  Recv ":bob!bob@UDS JOIN #foo\r\n";
+                 Recv ":alice!alice@UDS PRIVMSG #foo :hello bob\r\n";
+                 Send "NOTICE #foo :hello alice\r\n";
                  Send "QUIT :foo\r\n";
                  Recv ":testserver.test ERROR :So long\r\n";
                ]

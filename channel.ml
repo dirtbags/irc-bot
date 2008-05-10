@@ -46,13 +46,23 @@ let broadcast ?(metoo=false) chan sender command args text =
       Iobuf.write iobuf cmd
   in
     String_map.iter bwrite !(chan.clients)
-    
 
 let reply iobuf nick num ?(args=[]) text =
   write iobuf num (nick :: args) (Some text)
 
 let handle_command cli nuhost cmd =
   match (Command.as_tuple cmd) with
+    | (None, ("NOTICE" as cmd_name), [name], Some text)
+    | (None, ("PRIVMSG" as cmd_name), [name], Some text) ->
+        let nick = Irc.nick nuhost in
+          (try
+             let chan =  String_map.find name !by_name in
+               if String_map.mem nick !(chan.clients) then
+                 broadcast chan (cli, nuhost) cmd_name [name] (Some text)
+               else
+                 reply cli nick "404" ~args:[name] "Cannot send to channel"
+           with Not_found ->
+             reply cli nick "403" ~args:[name] "No such channel")
     | (None, "JOIN", ["0"], None) ->
         (* Leave all channels *)
         failwith "XXX: JOIN 0"
