@@ -414,9 +414,13 @@ let regression_tests =
                [
                  Send "ISON bob\r\n";
                  Recv ":testserver.test 303 alice :bob\r\n";
+                 Send "PRIVMSG #foo :snot\r\n";
+                 Recv ":testserver.test 403 alice #foo :No such channel\r\n";
+                 Send "NOTICE #foo :snot\r\n";
+                 Recv ":testserver.test 403 alice #foo :No such channel\r\n";
                  Send "JOIN #foo\r\n"; 
                  Recv ":alice!alice@UDS JOIN #foo\r\n";
-                 Send "PRIVMSG bob :Hi Bob!\r\n";
+                 Send "PRIVMSG bob :Come to #foo\r\n";
                  Recv ":bob!bob@UDS JOIN #foo\r\n";
                  Send "PRIVMSG #foo :hello bob\r\n";
                  Recv ":bob!bob@UDS NOTICE #foo :hello alice\r\n";
@@ -429,11 +433,7 @@ let regression_tests =
                [
                  Send "ISON alice charlie\r\n";
                  Recv ":testserver.test 303 bob :alice\r\n";
-                 Recv ":alice!alice@UDS PRIVMSG bob :Hi Bob!\r\n";
-                 Send "PRIVMSG #foo :snot\r\n";
-                 Recv ":testserver.test 404 bob #foo :Cannot send to channel\r\n";
-                 Send "NOTICE #foo :snot\r\n";
-                 Recv ":testserver.test 404 bob #foo :Cannot send to channel\r\n";
+                 Recv ":alice!alice@UDS PRIVMSG bob :Come to #foo\r\n";
                  Send "JOIN #foo\r\n";
                  Recv ":bob!bob@UDS JOIN #foo\r\n";
                  Recv ":alice!alice@UDS PRIVMSG #foo :hello bob\r\n";

@@ -50,38 +50,39 @@ let broadcast ?(metoo=false) chan sender command args text =
 let reply iobuf nick num ?(args=[]) text =
   write iobuf num (nick :: args) (Some text)
 
-let handle_command cli nuhost cmd =
-  match (Command.as_tuple cmd) with
-    | (None, ("NOTICE" as cmd_name), [name], Some text)
-    | (None, ("PRIVMSG" as cmd_name), [name], Some text) ->
-        let nick = Irc.nick nuhost in
-          (try
-             let chan =  String_map.find name !by_name in
-               if String_map.mem nick !(chan.clients) then
-                 broadcast chan (cli, nuhost) cmd_name [name] (Some text)
-               else
-                 reply cli nick "404" ~args:[name] "Cannot send to channel"
-           with Not_found ->
-             reply cli nick "403" ~args:[name] "No such channel")
-    | (None, "JOIN", ["0"], None) ->
-        (* Leave all channels *)
-        failwith "XXX: JOIN 0"
-    | (None, "JOIN", [name], None) ->
-        let nick = Irc.nick nuhost in
-        let chan = 
-          try
-            String_map.find name !by_name
-          with Not_found ->
-            let c = {name = name; modes = ref ""; clients = ref String_map.empty} in  
-              by_name := String_map.add name c !by_name;
-              c
-        in
+let handle_action (cli_iobuf, cli_nuhost) chan_name action args text =
+  let chanopt = try
+    Some (String_map.find chan_name !by_name)
+  with Not_found ->
+    None
+  in
+  let nick = Irc.nick cli_nuhost in
+    match (action, chanopt, args, text) with
+      | ("NOTICE", Some chan, [], Some text)
+      | ("PRIVMSG", Some chan, [], Some text) ->
           if String_map.mem nick !(chan.clients) then
-            (* Apparently we're expected to drop the command *)
-            ()
+            broadcast chan (cli_iobuf, cli_nuhost) action [chan_name] (Some text)
           else
-            let me = (cli, nuhost) in
-              chan.clients := String_map.add nick me !(chan.clients);
-              broadcast ~metoo:true chan me "JOIN" [name] None
-    | _ -> 
-        ()
+            reply cli_iobuf nick "404" ~args:[chan_name] "Cannot send to channel (join first)"
+      | ("JOIN", _, _, None) ->
+          let chan =
+            match chanopt with
+              | Some chan -> 
+                  chan
+              | None ->
+                  let c = {name = chan_name; modes = ref ""; clients = ref String_map.empty} in  
+                    by_name := String_map.add chan_name c !by_name;
+                    c
+          in
+            if String_map.mem nick !(chan.clients) then
+              (* Apparently we're expected to drop the command *)
+              ()
+            else
+              let me = (cli_iobuf, cli_nuhost) in
+                chan.clients := String_map.add nick me !(chan.clients);
+                broadcast ~metoo:true chan me "JOIN" [chan.name] None
+      | (_, None, _, _) ->
+          reply cli_iobuf nick "403" ~args:[chan_name] "No such channel"
+      | _ -> 
+          ()
+

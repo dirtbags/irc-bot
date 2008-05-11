@@ -56,8 +56,8 @@ let handle_command cli iobuf cmd =
         Iobuf.close iobuf message
     | (None, "JOIN", ["0"], None) ->
         ()
-    | (None, "JOIN", [channels], None) ->
-        Channel.handle_command cli.iobuf (nuhost cli) cmd
+    | (None, "JOIN", [chan_name], None) ->
+        Channel.handle_action (cli.iobuf, (nuhost cli)) chan_name "JOIN" [] None
     | (None, "JOIN", [channels; keys], None) ->
         ()
     | (None, "PART", [channels], message) ->
@@ -74,17 +74,17 @@ let handle_command cli iobuf cmd =
         ()
     | (None, "KICK", [channels; users], comment) ->
         ()
-    | (None, ("PRIVMSG" as command), [target], Some text)
-    | (None, ("NOTICE" as command), [target], Some text) ->
+    | (None, ("PRIVMSG" as action), [target], Some text)
+    | (None, ("NOTICE" as action), [target], Some text) ->
         if Channel.is_channel_name target then
-          Channel.handle_command cli.iobuf (nuhost cli) cmd
+          Channel.handle_action (cli.iobuf, (nuhost cli)) target action [] (Some text)
         else
           begin
             try
               let peer = lookup target in
                 write peer 
                   (Some (Irc.string_of_nuhost (nuhost cli))) 
-                  command [target] (Some text)
+                  action [target] (Some text)
             with Not_found ->
               reply cli "401" ~args:[target] "No such nick/channel"
           end
