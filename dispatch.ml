@@ -1,6 +1,6 @@
-type event = Input | Priority | Output | Error | Hangup
+type event = Input | Output | Exception
 type timer_handler = float -> unit
-type fd_handler = Unix.file_descr -> event list -> unit
+type fd_handler = Unix.file_descr -> event -> unit
 
 module Timer =
   Set.Make (struct
@@ -15,9 +15,10 @@ module Fd_map =
             end)
 
 type t = {
-  e : Epoll.t;
-  fds : (fd_handler * event list) Fd_map.t ref;
-  numfds : int ref;
+  read_fds : Unix.file_descr list ref;
+  write_fds : Unix.file_descr list ref;
+  except_fds : Unix.file_descr list ref;
+  handlers : fd_handler Fd_map.t ref;
   timers : Timer.t ref;
 }
 
@@ -29,53 +30,52 @@ type t = {
 
 let timeout_fudge = 0.001
 
-let to_epoll = function
-  | Input -> Epoll.In
-  | Priority -> Epoll.Priority
-  | Output -> Epoll.Out
-  | Error -> Epoll.Error
-  | Hangup -> Epoll.Hangup
-
-let from_epoll = function
-  | Epoll.In -> Input
-  | Epoll.Priority -> Priority
-  | Epoll.Out -> Output
-  | Epoll.Error -> Error
-  | Epoll.Hangup -> Hangup
-
-let rec epoll_events_of_events = List.map to_epoll
-  
-let rec events_of_epoll_events = List.map from_epoll
-
 let create size =
-  {e = Epoll.create size;
-   fds = ref Fd_map.empty;
-   numfds = ref 0;
+  {read_fds = ref [];
+   write_fds = ref [];
+   except_fds = ref [];
+   handlers = ref Fd_map.empty;
    timers = ref Timer.empty}
 
 let destroy d =
-  Epoll.destroy d.e;
   (* Explicitly unreference fds and timers, in case d sticks around *)
-  d.fds := Fd_map.empty;
-  d.numfds := 0;
+  d.handlers := Fd_map.empty;
   d.timers := Timer.empty
 
-let add d fd handler events =
-  Epoll.ctl d.e Epoll.Add (fd, (epoll_events_of_events events));
-  d.fds := Fd_map.add fd (handler, events) !(d.fds);
-  d.numfds := !(d.numfds) + 1
+let get_fds d event =
+  match event with
+    | Input -> d.read_fds
+    | Output -> d.write_fds
+    | Exception -> d.except_fds
 
 let modify d fd events =
-  Epoll.ctl d.e Epoll.Modify (fd, (epoll_events_of_events events))
+  let add_event event =
+    let l = get_fds d event in
+    let nl = (List.filter ((<>) fd) !l) in
+      if List.mem event events then
+        l := fd :: nl
+      else
+        l := nl
+  in
+    if Fd_map.mem fd !(d.handlers) then
+      List.iter add_event [Input; Output; Exception]
+    else
+      raise Not_found
 
 let set_handler d fd handler =
-  let (_, events) = Fd_map.find fd !(d.fds) in
-    d.fds := Fd_map.add fd (handler, events) !(d.fds)
+  d.handlers := Fd_map.add fd handler !(d.handlers)
+
+let add d fd handler events =
+  set_handler d fd handler;
+  modify d fd events
 
 let delete d fd =
-  Epoll.ctl d.e Epoll.Delete (fd, []);
-  d.fds := Fd_map.remove fd !(d.fds);
-  d.numfds := !(d.numfds) - 1
+  let del_event event =
+    let l = get_fds d event in
+      l := (List.filter ((<>) fd) !l)
+  in
+    d.handlers := Fd_map.remove fd !(d.handlers);
+    List.iter del_event [Input; Output; Exception]
 
 let add_timer d handler time =
   d.timers := Timer.add (time, handler) !(d.timers)
@@ -98,15 +98,19 @@ let rec dispatch_timers d now =
         dispatch_timers d now
       end
 
-let rec dispatch_results d events_list =
-  match events_list with
-    | [] ->
-        ()
-    | (fd, epoll_events) :: tl ->
-        let handler, _ = Fd_map.find fd !(d.fds) in
-        let events = events_of_epoll_events epoll_events in
-          handler fd events;
-          dispatch_results d tl
+let rec dispatch_results d (read_ready, write_ready, except_ready) =
+  let rec dispatch event fd_list =
+    match fd_list with
+      | [] ->
+          ()
+      | fd :: tl ->
+          let handler = Fd_map.find fd !(d.handlers) in
+            handler fd event;
+            dispatch event tl
+  in
+    dispatch Input read_ready;
+    dispatch Output write_ready;
+    dispatch Exception except_ready
 
 let once d =
   let now = Unix.gettimeofday () in
@@ -118,19 +122,16 @@ let once d =
     with Not_found ->
       (-1.0)
   in
-    (if !(d.numfds) = 0 then
-       (* epoll()--and probably poll()--barfs if it has no file descriptors *)
-       ignore (Unix.select [] [] [] timeout)
-     else
-       (* poll() and epoll() wait *at most* timeout ms.  If you have fds but they're not
-	  doing anything, multiple calls to once may be required.  This is lame. *)
-       let timeout_ms = int_of_float (timeout *. 1000.0) in
-       let result = Epoll.wait d.e !(d.numfds) timeout_ms in
-	 dispatch_results d result);
+    (* select () waits *at most* timeout ms.  If you have fds but they're
+not
+       doing anything, multiple calls to once may be required.  This is
+       lame. *)
+  let result = Unix.select !(d.read_fds) !(d.write_fds) !(d.except_fds) timeout in
+    dispatch_results d result;
     dispatch_timers d (Unix.gettimeofday ())
 
 let rec run d =    
-  if ((!(d.fds) == Fd_map.empty) &&
+  if ((!(d.handlers) == Fd_map.empty) &&
         (!(d.timers) == Timer.empty)) then
     ()
   else begin

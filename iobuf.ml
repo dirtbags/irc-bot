@@ -54,21 +54,20 @@ let write iobuf cmd =
       if ((len = 0) && (!(iobuf.unsent) = ""))  then
         Dispatch.modify iobuf.d iobuf.fd [Dispatch.Input; Dispatch.Output]
 
-let rec handle_events iobuf fd events =
-  match events with
-    | [] ->
-	()
-    | Dispatch.Input :: tl ->
+let handle_event iobuf fd event =
+  match event with
+    | Dispatch.Input ->
         let size = ibuf_max - !(iobuf.ibuf_len) in
-        let len = Unix.read fd iobuf.ibuf !(iobuf.ibuf_len) size in
-          iobuf.ibuf_len := !(iobuf.ibuf_len) + len;
-          handle_input iobuf;
-          if (!(iobuf.ibuf_len) = ibuf_max) then
-            (* No newline found, and the buffer is full *)
-	    close iobuf "Input buffer overrun"
-	  else
-	    handle_events iobuf fd tl
-    | Dispatch.Output :: tl ->
+          (match Unix.read fd iobuf.ibuf !(iobuf.ibuf_len) size with
+             | 0 ->
+                 close iobuf "Hangup"
+             | len ->
+                 iobuf.ibuf_len := !(iobuf.ibuf_len) + len;
+                 handle_input iobuf;
+                 if (!(iobuf.ibuf_len) = ibuf_max) then
+                   (* No newline found, and the buffer is full *)
+	           close iobuf "Input buffer overrun")
+    | Dispatch.Output ->
         let buf = Buffer.create obuf_max in
           Buffer.add_string buf !(iobuf.unsent);
           while (((Buffer.length buf) < obuf_max) &&
@@ -82,25 +81,18 @@ let rec handle_events iobuf fd events =
           let n = Unix.single_write fd bufstr 0 buflen in
 	    if n < buflen then begin
               iobuf.unsent := Str.string_after bufstr n;
-	      handle_events iobuf fd tl
             end else if Queue.is_empty iobuf.outq then
               if !(iobuf.alive) then begin
                 (* We're out of data to send *)
 	        Dispatch.modify iobuf.d fd [Dispatch.Input];
-	        handle_events iobuf fd tl
               end else begin
                 (* Close dead connection after all output has despooled *)
                 Dispatch.delete iobuf.d iobuf.fd;
                 Unix.close iobuf.fd
               end
-    | Dispatch.Priority :: tl ->
+    | Dispatch.Exception ->
 	let s = String.create 4096 in
-	  ignore (Unix.recv fd s 0 4096 [Unix.MSG_OOB]);
-	  handle_events iobuf fd tl
-    | Dispatch.Error :: tl ->
-	close iobuf "Error"
-    | Dispatch.Hangup :: tl ->
-	close iobuf "Hangup"
+	  ignore (Unix.recv fd s 0 4096 [Unix.MSG_OOB])
 
 let bind iobuf handle_command handle_error =
   iobuf.handle_command := handle_command;
@@ -117,5 +109,5 @@ let create d fd name handle_command handle_error =
                handle_command = ref handle_command;
                handle_error = ref handle_error;
                alive = ref true} in
-    Dispatch.add d fd (handle_events iobuf) [Dispatch.Input];
+    Dispatch.add d fd (handle_event iobuf) [Dispatch.Input];
     iobuf

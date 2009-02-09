@@ -1,12 +1,9 @@
 OCAMLPACKS[] = 
     unix
     str
-OCAML_CLIBS = ocamlepoll
 OCAMLCFLAGS += -g
 
 .DEFAULT: bot
-
-StaticCLibrary(ocamlepoll, epoll_wrapper)
 
 OCamlProgram(bot, bot irc command iobuf dispatch)
 
