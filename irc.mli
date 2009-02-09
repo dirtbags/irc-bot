@@ -1,4 +1,3 @@
-
 (** (Nickname, username, hostname) tuple *)
 type nuhost = (string * string * string)
 

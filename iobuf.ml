@@ -7,7 +7,7 @@ type t = {d: Dispatch.t;
           unsent: string ref;
           ibuf: string;
           ibuf_len: int ref;
-          addr: Unix.sockaddr;
+          name: string;
           handle_command: command_handler ref;
           handle_error: error_handler ref;
           alive: bool ref}
@@ -19,12 +19,7 @@ let ibuf_max = 4096
 let max_outq = 50
 let obuf_max = 4096
 
-let addr iobuf = 
-  match iobuf.addr with
-    | Unix.ADDR_UNIX s ->
-        "UDS"
-    | Unix.ADDR_INET (addr, port) ->
-        Unix.string_of_inet_addr addr
+let name iobuf = iobuf.name
 
 let crlf = Str.regexp "\r?\n"
 
@@ -111,15 +106,16 @@ let bind iobuf handle_command handle_error =
   iobuf.handle_command := handle_command;
   iobuf.handle_error := handle_error
 
-let create d fd addr handle_command handle_error =
+let create d fd name handle_command handle_error =
   let iobuf = {d = d;
                fd = fd;
                outq = Queue.create ();
                unsent = ref "";
                ibuf = String.create ibuf_max;
                ibuf_len = ref 0;
-               addr = addr;
+               name = name;
                handle_command = ref handle_command;
                handle_error = ref handle_error;
                alive = ref true} in
-    Dispatch.add d fd (handle_events iobuf) [Dispatch.Input]
+    Dispatch.add d fd (handle_events iobuf) [Dispatch.Input];
+    iobuf

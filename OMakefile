@@ -1,13 +1,14 @@
 OCAMLPACKS[] = 
+    unix
     str
 OCAML_CLIBS = ocamlepoll
 OCAMLCFLAGS += -g
 
-.DEFAULT: ircd
+.DEFAULT: bot
 
 StaticCLibrary(ocamlepoll, epoll_wrapper)
 
-OCamlProgram(ircd, ircd irc command iobuf dispatch client channel)
+OCamlProgram(bot, bot irc command iobuf dispatch)
 
 section
 	OCAMLPACKS[] +=

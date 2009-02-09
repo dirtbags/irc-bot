@@ -1,27 +1,33 @@
-type t = string option * string * string list * string option
+type t = {sender: string option;
+          name: string;
+          args: string list;
+          text: string option}
 
 let create sender name args text =
-  (sender, name, args, text)
+  {sender = sender;
+   name = name;
+   args = args;
+   text = text}
 
 let anon = create None
 
-let as_string (sender, name, args, text) =
+let as_string cmd =
   let ret = Buffer.create 120 in
-    (match sender with
+    (match cmd.sender with
        | None -> 
 	   ()
        | Some s ->
 	   Buffer.add_char ret ':';
 	   Buffer.add_string ret s;
 	   Buffer.add_char ret ' ');
-    Buffer.add_string ret name;
-    (match args with
+    Buffer.add_string ret cmd.name;
+    (match cmd.args with
        | [] ->
 	   ()
        | l ->
 	   Buffer.add_char ret ' ';
 	   Buffer.add_string ret (String.concat " " l));
-    (match text with
+    (match cmd.text with
        | None ->
 	   ()
        | Some txt ->
@@ -64,9 +70,9 @@ let rec from_string line =
     loop None [] line
 
 
-let as_tuple cmd = cmd
+let as_tuple cmd = (cmd.sender, cmd.name, cmd.args, cmd.text)
 
-let sender (sender, name, args, text) = sender
-let name (sender, name, args, text) = name
-let args (sender, name, args, text) = args
-let text (sender, name, args, text) = text
+let sender cmd = cmd.sender
+let name cmd = cmd.name
+let args cmd = cmd.args
+let text cmd = cmd.text
