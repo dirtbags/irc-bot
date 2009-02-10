@@ -5,7 +5,7 @@ OCAMLCFLAGS += -g
 
 .DEFAULT: bot
 
-OCamlProgram(bot, bot irc command iobuf dispatch)
+OCamlProgram(bot, bot irc command iobuf dispatch cdb)
 
 section
 	OCAMLPACKS[] +=

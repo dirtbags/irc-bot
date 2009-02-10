@@ -1,3 +1,16 @@
+let info_db = Cdb.open_cdb_in "/home/neale/src/firebot/info.cdb"
+let _ = Random.self_init ()
+
+let choice l =
+  let n = Random.int (List.length l) in
+    List.nth l n
+
+let get_one key =
+  let matches = Cdb.get_matches info_db key in
+  match Stream.npeek 120 matches with
+    | [] -> raise Not_found
+    | keys -> choice keys
+
 let write iobuf command args text =
   let cmd = Command.create None command args text in
     print_endline ("--> " ^ (Command.as_string cmd));
@@ -12,6 +25,24 @@ let handle_command iobuf cmd =
         write iobuf "JOIN" ["#bot"] None
     | (Some who, "JOIN", [], Some chan) ->
         write iobuf "PRIVMSG" [chan] (Some "hi asl")
+    | (Some who, "PRIVMSG", [target], Some text) ->
+        if target.[0] = '#' then
+          try
+            let factoid = get_one text in
+            let response = 
+              match factoid.[0] with
+                | ':' ->
+                    "\001ACTION " ^ (Str.string_after factoid 1) ^ "\001"
+                | '\\' ->
+                    Str.string_after factoid 1
+                | _ ->
+                    Printf.sprintf "Gosh, %s, I think %s is %s" who text factoid
+            in
+            write iobuf "PRIVMSG" [target] (Some response)
+          with Not_found ->
+            ()
+        else
+          ()
     | _ ->
         ()
 
