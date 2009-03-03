@@ -2,222 +2,124 @@
 
 open Ocs_error
 
-(* Ports can either be file descriptors or string buffers.  File
-   descriptors may be valid for both input and output, but when
-   switching between the two modes, the file offset may not work
-   as expected.
-
-   For unbuffered or asynchronous I/O, from Scheme or otherwise,
-   the port can simply be used as a reference to the file
-   descriptor.  *)
+type port_impl =
+  | Input_channel of in_channel
+  | Output_channel of out_channel
+  | Input_string of string * int ref
+  | Output_string of Buffer.t
 
 type port = {
-  mutable p_buf : string;
-  mutable p_pos : int;
-  mutable p_wend : int;
-  mutable p_rend : int;
-  mutable p_ugc : char option;
-  mutable p_fd : Unix.file_descr option;
-  mutable p_input : bool;
-  mutable p_output : bool;
-  p_close : bool
+  ungot : char option ref;
+  impl : port_impl;
 }
 
-type port_flag =
-    Pf_input
-  | Pf_output
-  | Pf_close
-
-let mkbuf () =
-  String.create 1024
-;;
-
-let mkport buf fd inf outf cl =
-  { p_buf = buf;
-    p_pos = 0;
-    p_wend = 0;
-    p_rend = 0;
-    p_ugc = None;
-    p_fd = fd;
-    p_input = inf;
-    p_output = outf;
-    p_close = cl }
-;;
-
 let is_input p =
-  p.p_input
-;;
+  match p.impl with
+    | Input_string _
+    | Input_channel _ -> true
+    | _ -> false
 
 let is_output p =
-  p.p_output
-;;
-
-let wrflush p =
-  if not p.p_output then
-    raise (Error "not a valid output port");
-  match p.p_fd with
-    Some fd ->
-      if p.p_wend > 0 && p.p_pos > 0 then
-	begin
-	  try
-	    let n = Unix.write fd p.p_buf 0 p.p_pos in
-	      if n <> p.p_pos then
-		raise (Error "write error: incomplete write")
-	  with
-	    Unix.Unix_error (e, _, _) ->
-	      raise (Error ("write error: " ^ Unix.error_message e))
-	end;
-      p.p_pos <- 0;
-      p.p_wend <- String.length p.p_buf
-  | None ->
-      if p.p_pos = p.p_wend then
-	let n = String.length p.p_buf in
-	let nbuf = String.create (n * 2) in
-	  String.blit p.p_buf 0 nbuf 0 n;
-	  p.p_buf <- nbuf;
-	  p.p_wend <- String.length p.p_buf
-;;
-
-let rdfill p =
-  if not p.p_input then
-    raise (Error "not a valid input port");
-  if p.p_wend > 0 then
-    wrflush p;
-  p.p_pos <- 0;
-  p.p_rend <- 0;
-  p.p_wend <- 0;
-  match p.p_fd with
-    Some fd ->
-      begin
-	try
-	  p.p_rend <- Unix.read fd p.p_buf 0 (String.length p.p_buf)
-	with
-	  Unix.Unix_error (e, _, _) ->
-	    raise (Error ("read error: " ^ Unix.error_message e))
-      end
-  | None -> ()
-;;
+  match p.impl with
+    | Output_string _
+    | Output_channel _ -> true
+    | _ -> false
 
 let getc p =
-  match p.p_ugc with
-    Some _ as c -> p.p_ugc <- None; c
-  | None ->
-      if p.p_rend = 0 || p.p_pos >= p.p_rend then rdfill p;
-      if p.p_rend = 0 then None
-      else
-	begin
-	  assert (p.p_pos < p.p_rend);
-	  let c = p.p_buf.[p.p_pos] in
-	    p.p_pos <- p.p_pos + 1;
-	    Some c
-	end
-;;
-
-let get_fd p =
-  p.p_fd
-;;
+  match (!(p.ungot), p.impl) with
+    | (Some c, _) ->
+        p.ungot := None;
+        Some c
+    | (None, Input_string (str, pos)) ->
+        if !pos >= (String.length str) then
+          None
+        else
+          let c = str.[!pos] in
+            pos := !pos + 1;
+            Some c
+    | (None, Input_channel chan) ->
+        begin
+          try
+            Some (input_char chan)
+          with End_of_file ->
+            None
+        end
+    | _ ->
+        None
 
 let flush p =
-  if p.p_wend > 0 then
-    wrflush p
-;;
+  match p.impl with
+    | Output_channel chan ->
+        Pervasives.flush chan
+    | _ ->
+        ()
 
 let close p =
-  if p.p_input || p.p_output then
-    begin
-      flush p;
-      p.p_input <- false;
-      p.p_output <- false;
-      match p.p_fd with
-	Some fd ->
-	  if p.p_close then Unix.close fd;
-	  p.p_fd <- None
-      | None -> ()
-    end
-;;
+  p.ungot := None;
+  match p.impl with
+    | Input_channel chan ->
+        close_in chan
+    | Output_channel chan ->
+        close_out chan
+    | _ ->
+        ()
 
 let ungetc p c =
-  p.p_ugc <- Some c
-;;
+  p.ungot := Some c
 
 let char_ready p =
-  if p.p_ugc <> None || p.p_pos < p.p_rend then true
-  else if not p.p_input then false
-  else
-    match p.p_fd with
-      Some fd ->
-	let (r, _, _) = Unix.select [ fd ] [] [] 0.0 in
-	  List.length r > 0
-    | None -> false
-;;
+  match (!(p.ungot), p.impl) with
+    | (Some _, Input_string _)
+    | (Some _, Input_channel _) ->
+        true
+    | (None, Input_string (str, pos)) ->
+        !pos < (String.length str)
+    | (None, Input_channel chan) ->
+        let fd = Unix.descr_of_in_channel chan in
+        let (r, _, _) = Unix.select [fd] [] [] 0.0 in
+          List.length r > 0
+    | _ ->
+        false
 
 let putc p c =
-  if p.p_wend = 0 || p.p_pos >= p.p_wend then
-    wrflush p;
-  assert (p.p_pos < p.p_wend);
-  p.p_buf.[p.p_pos] <- c;
-  p.p_pos <- p.p_pos + 1
-;;
+  match p.impl with
+    | Output_string buf ->
+        Buffer.add_char buf c
+    | Output_channel chan ->
+        output_char chan c
+    | _ ->
+        ()
 
 let puts p s =
-  let n = String.length s in
-    if n > 0 && p.p_rend - p.p_pos >= n then
-      begin
-	String.blit s 0 p.p_buf p.p_pos n;
-	p.p_pos <- p.p_pos + n
-      end
-    else
-      String.iter (fun c -> putc p c) s
-;;
-
-let fd_port fd flags =
-  let inf = ref false
-  and outf = ref false
-  and clf = ref false in
-    List.iter (function
-		Pf_input -> inf := true
-	      | Pf_output -> outf := true
-	      | Pf_close -> clf := true) flags;
-    let p = mkport (mkbuf ()) (Some fd) !inf !outf !clf in
-      if !clf then Gc.finalise close p;
-      p
-;;
+  match p.impl with
+    | Output_string buf ->
+        Buffer.add_string buf s
+    | Output_channel chan ->
+        output_string chan s
+    | _ ->
+        ()
 
 let input_port ch =
-  fd_port (Unix.descr_of_in_channel ch) [ Pf_input ]
-;;
+  { ungot = ref None; impl = Input_channel ch }
 
 let output_port ch =
-  fd_port (Unix.descr_of_out_channel ch) [ Pf_output ]
-;;
+  { ungot = ref None; impl = Output_channel ch }
 
 let open_input_port name =
   try
-    let fd = Unix.openfile name [ Unix.O_RDONLY ] 0 in
-      fd_port fd [ Pf_input; Pf_close ]
-  with
-    Unix.Unix_error (e, _, _) ->
-      let err = Unix.error_message e in
-	raise (Error ("unable to open '" ^ name ^ "' for input: " ^ err))
-;;
+    input_port (open_in_bin name)
+  with Sys_error err ->
+    raise (Error ("unable to open '" ^ name ^ "' for input: " ^ err))
 
 let open_output_port name =
   try
-    let fd = Unix.openfile name [ Unix.O_WRONLY; Unix.O_APPEND;
-				  Unix.O_CREAT; Unix.O_TRUNC ] 0o666 in
-      fd_port fd [ Pf_output; Pf_close ]
-  with
-    Unix.Unix_error (e, _, _) ->
-      let err = Unix.error_message e in
-	raise (Error ("unable to open '" ^ name ^ "' for output: " ^ err))
-;;
+    output_port (open_out_bin name)
+  with Sys_error err ->
+    raise (Error ("unable to open '" ^ name ^ "' for output: " ^ err))
 
 let string_input_port s =
-  let p = mkport s None true false false in
-    p.p_rend <- String.length s;
-    p
-;;
+  { ungot = ref None; impl = Input_string (s, ref 0) }
 
 let string_output_port () =
-  mkport (mkbuf ()) None false true false
-;;
+  { ungot = ref None; impl = Output_string (Buffer.create 256) }
+
