@@ -16,6 +16,68 @@ let write iobuf command args text =
     print_endline ("--> " ^ (Command.as_string cmd));
     Iobuf.write iobuf cmd
 
+let rec string_of_sval = function
+  | Ocs_types.Snull -> "()"
+  | Ocs_types.Seof -> "#<eof>"
+  | Ocs_types.Strue -> "#t"
+  | Ocs_types.Sfalse -> "#f"
+  | Ocs_types.Sstring s -> s
+  | Ocs_types.Ssymbol s -> s
+  | Ocs_types.Sint i -> (string_of_int i)
+  | Ocs_types.Sreal r -> (Ocs_numstr.string_of_real r)
+  | Ocs_types.Scomplex z -> (Ocs_numstr.string_of_complex z)
+  | Ocs_types.Sbigint b -> (Big_int.string_of_big_int b)
+  | Ocs_types.Srational r -> (Ratio.string_of_ratio r)
+  | Ocs_types.Schar c -> String.make 1 c
+  | Ocs_types.Spair l -> "#<it's a pair>"
+  | Ocs_types.Svector v -> "#<it's a vector>"
+  | Ocs_types.Sport _ -> "#<port>"
+  | Ocs_types.Sproc _ -> "#<procedure>"
+  | Ocs_types.Sprim { Ocs_types.prim_fun = _; Ocs_types.prim_name = n } ->
+      "#<primitive:" ^ n ^ ">"
+  | Ocs_types.Spromise _ -> "#<promise>"
+  | Ocs_types.Sesym (_, s) -> string_of_sval s
+  | Ocs_types.Swrapped _ -> "#<wrapped>"
+  | Ocs_types.Sunspec -> "#<unspecified>"
+  | _ -> "#<unknown>"
+
+let scheme_eval str =
+  let thread = Ocs_top.make_thread () in
+  let env = Ocs_top.make_env () in
+  let inport = Ocs_port.string_input_port str in
+  let lexer = Ocs_lex.make_lexer inport "interactive" in
+  let v = Ocs_read.read_expr lexer in
+  let c = Ocs_compile.compile env v in
+  let buf = Buffer.create 20 in
+  let printer v =
+    Buffer.add_string buf (string_of_sval v)
+  in
+    try
+      Ocs_eval.eval thread printer c;
+      Buffer.contents buf
+    with Ocs_error.Error msg ->
+      msg
+
+
+let handle_privmsg iobuf sender target text =
+  try
+    let factoid = get_one text in
+    let response = 
+      match factoid.[0] with
+        | ':' ->
+            "\001ACTION " ^ (Str.string_after factoid 1) ^ "\001"
+        | '\\' ->
+            Str.string_after factoid 1
+        | _ ->
+            Printf.sprintf "Gosh, %s, I think %s is %s" sender text factoid
+    in
+      write iobuf "PRIVMSG" [target] (Some response)
+  with Not_found ->
+    if text.[0] == '(' then
+      let result = scheme_eval text in
+        write iobuf "PRIVMSG" [target] (Some result)
+
+
 let handle_command iobuf cmd =
   print_endline ("<-- " ^ (Command.as_string cmd));
   match Command.as_tuple cmd with
@@ -23,26 +85,11 @@ let handle_command iobuf cmd =
         write iobuf "PONG" [] text
     | (_, "001", _, _) ->
         write iobuf "JOIN" ["#bot"] None
-    | (Some who, "JOIN", [], Some chan) ->
+    | (Some sender, "JOIN", [], Some chan) ->
         write iobuf "PRIVMSG" [chan] (Some "hi asl")
-    | (Some who, "PRIVMSG", [target], Some text) ->
+    | (Some sender, "PRIVMSG", [target], Some text) ->
         if target.[0] = '#' then
-          try
-            let factoid = get_one text in
-            let response = 
-              match factoid.[0] with
-                | ':' ->
-                    "\001ACTION " ^ (Str.string_after factoid 1) ^ "\001"
-                | '\\' ->
-                    Str.string_after factoid 1
-                | _ ->
-                    Printf.sprintf "Gosh, %s, I think %s is %s" who text factoid
-            in
-            write iobuf "PRIVMSG" [target] (Some response)
-          with Not_found ->
-            ()
-        else
-          ()
+          handle_privmsg iobuf sender target text
     | _ ->
         ()
 
