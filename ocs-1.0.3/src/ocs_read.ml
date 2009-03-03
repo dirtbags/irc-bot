@@ -83,5 +83,5 @@ let read_from_port p =
 ;;
 
 let read_from_string s =
-  read_from_port (Ocs_port.string_input_port s)
+  read_from_port (Ocs_port.open_input_string s)
 ;;

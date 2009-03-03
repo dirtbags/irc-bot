@@ -6,8 +6,9 @@ val input_port : in_channel -> port
 val output_port : out_channel -> port
 val open_input_port : string -> port
 val open_output_port : string -> port
-val string_input_port : string -> port
-val string_output_port : unit -> port
+val open_input_string : string -> port
+val open_output_string : unit -> port
+val get_output_string : port -> string
 
 val is_input : port -> bool
 val is_output : port -> bool

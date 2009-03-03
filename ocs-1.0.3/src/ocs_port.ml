@@ -117,9 +117,15 @@ let open_output_port name =
   with Sys_error err ->
     raise (Error ("unable to open '" ^ name ^ "' for output: " ^ err))
 
-let string_input_port s =
+let open_input_string s =
   { ungot = ref None; impl = Input_string (s, ref 0) }
 
-let string_output_port () =
+let open_output_string () =
   { ungot = ref None; impl = Output_string (Buffer.create 256) }
 
+let get_output_string p =
+  match p.impl with
+    | Output_string buf ->
+        Buffer.contents buf
+    | _ ->
+        ""
