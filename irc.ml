@@ -8,6 +8,11 @@ let dbg msg a =
   prerr_endline ("[" ^ msg ^ "]");
   a
 
+let is_channel str =
+  match str with
+    | '#' | '+' | '&' -> true
+    | _ -> false
+
 let string_map f s =
   let l = String.length s in
   if l = 0 then

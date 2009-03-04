@@ -84,11 +84,11 @@ let handle_command iobuf cmd =
     | (_, "PING", _, text) ->
         write iobuf "PONG" [] text
     | (_, "001", _, _) ->
-        write iobuf "JOIN" ["#bot"] None
+        write iobuf "JOIN" ["+bot"] None
     | (Some sender, "JOIN", [], Some chan) ->
         write iobuf "PRIVMSG" [chan] (Some "hi asl")
     | (Some sender, "PRIVMSG", [target], Some text) ->
-        if target.[0] = '#' then
+        if Irc.is_channel target then
           handle_privmsg iobuf sender target text
     | _ ->
         ()
