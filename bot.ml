@@ -17,18 +17,20 @@ let write iobuf command args text =
     Iobuf.write iobuf cmd
 
 let scheme_eval str =
-  let thread = Ocs_top.make_thread () in
-  let env = Ocs_top.make_env () in
-  let inport = Ocs_port.open_input_string str in
-  let outport = Ocs_port.open_output_string () in
-  let lexer = Ocs_lex.make_lexer inport "interactive" in
-  let v = Ocs_read.read_expr lexer in
-  let c = Ocs_compile.compile env v in
-    try
+  try
+    let thread = Ocs_top.make_thread () in
+    let env = Ocs_top.make_env () in
+    let inport = Ocs_port.open_input_string str in
+    let outport = Ocs_port.open_output_string () in
+    let lexer = Ocs_lex.make_lexer inport "interactive" in
+    let v = Ocs_read.read_expr lexer in
+    let c = Ocs_compile.compile env v in
       Ocs_eval.eval thread (Ocs_print.print outport false) c;
       Ocs_port.get_output_string outport
-    with Ocs_error.Error msg ->
-      msg
+  with 
+    | Ocs_error.Error msg 
+    | Ocs_error.ErrorL (_, msg) ->
+        "Error: " ^ msg
 
 
 let handle_privmsg iobuf sender target text =
