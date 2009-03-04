@@ -16,12 +16,6 @@ bot: $(OCS_DIR)/src/ocs.cma
 $(OCS_DIR)/src/ocs.cma $(OCS_DIR)/src/ocs.cmxa: $(OCS_DIR)
 	cd $(OCS_DIR)/src && make
 
-$(OCS_DIR): ocs-$(OCS_VERSION).tar.gz
-	tar xzf $<
-
-ocs-$(OCS_VERSION).tar.gz:
-	wget http://will.iki.fi/software/ocs/files/$@
-
 .PHONY: clean
 clean:
 	rm -f bot *.cm* *.o
