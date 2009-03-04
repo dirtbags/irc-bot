@@ -9,9 +9,12 @@ let dbg msg a =
   a
 
 let is_channel str =
-  match str with
-    | '#' | '+' | '&' -> true
-    | _ -> false
+  if str == "" then
+    false
+  else
+    match str.[0] with
+      | '#' | '+' | '&' -> true
+      | _ -> false
 
 let string_map f s =
   let l = String.length s in

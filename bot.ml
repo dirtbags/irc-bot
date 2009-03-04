@@ -16,45 +16,17 @@ let write iobuf command args text =
     print_endline ("--> " ^ (Command.as_string cmd));
     Iobuf.write iobuf cmd
 
-let rec string_of_sval = function
-  | Ocs_types.Snull -> "()"
-  | Ocs_types.Seof -> "#<eof>"
-  | Ocs_types.Strue -> "#t"
-  | Ocs_types.Sfalse -> "#f"
-  | Ocs_types.Sstring s -> s
-  | Ocs_types.Ssymbol s -> s
-  | Ocs_types.Sint i -> (string_of_int i)
-  | Ocs_types.Sreal r -> (Ocs_numstr.string_of_real r)
-  | Ocs_types.Scomplex z -> (Ocs_numstr.string_of_complex z)
-  | Ocs_types.Sbigint b -> (Big_int.string_of_big_int b)
-  | Ocs_types.Srational r -> (Ratio.string_of_ratio r)
-  | Ocs_types.Schar c -> String.make 1 c
-  | Ocs_types.Spair l -> "#<it's a pair>"
-  | Ocs_types.Svector v -> "#<it's a vector>"
-  | Ocs_types.Sport _ -> "#<port>"
-  | Ocs_types.Sproc _ -> "#<procedure>"
-  | Ocs_types.Sprim { Ocs_types.prim_fun = _; Ocs_types.prim_name = n } ->
-      "#<primitive:" ^ n ^ ">"
-  | Ocs_types.Spromise _ -> "#<promise>"
-  | Ocs_types.Sesym (_, s) -> string_of_sval s
-  | Ocs_types.Swrapped _ -> "#<wrapped>"
-  | Ocs_types.Sunspec -> "#<unspecified>"
-  | _ -> "#<unknown>"
-
 let scheme_eval str =
   let thread = Ocs_top.make_thread () in
   let env = Ocs_top.make_env () in
-  let inport = Ocs_port.string_input_port str in
+  let inport = Ocs_port.open_input_string str in
+  let outport = Ocs_port.open_output_string () in
   let lexer = Ocs_lex.make_lexer inport "interactive" in
   let v = Ocs_read.read_expr lexer in
   let c = Ocs_compile.compile env v in
-  let buf = Buffer.create 20 in
-  let printer v =
-    Buffer.add_string buf (string_of_sval v)
-  in
     try
-      Ocs_eval.eval thread printer c;
-      Buffer.contents buf
+      Ocs_eval.eval thread (Ocs_print.print outport false) c;
+      Ocs_port.get_output_string outport
     with Ocs_error.Error msg ->
       msg
 
@@ -84,7 +56,7 @@ let handle_command iobuf cmd =
     | (_, "PING", _, text) ->
         write iobuf "PONG" [] text
     | (_, "001", _, _) ->
-        write iobuf "JOIN" ["+bot"] None
+        write iobuf "JOIN" ["#bot"] None
     | (Some sender, "JOIN", [], Some chan) ->
         write iobuf "PRIVMSG" [chan] (Some "hi asl")
     | (Some sender, "PRIVMSG", [target], Some text) ->
@@ -103,7 +75,7 @@ let main () =
   let _ = Unix.connect conn (Unix.ADDR_INET (host.Unix.h_addr_list.(0), 6667)) in
   let iobuf = Iobuf.create dispatcher conn "woozle" handle_command handle_error in
     write iobuf "NICK" ["bot"] None;
-    write iobuf "USER" ["bot"; "bot"; "bot"] (Some "Da Bot");
+    write iobuf "USER" ["bot"; "bot"; "bot"] (Some "A Bot");
     Dispatch.run dispatcher
     
 
