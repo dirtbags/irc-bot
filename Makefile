@@ -1,24 +1,12 @@
-OCS_VERSION = 1.0.3
-OCS_DIR = ocs-$(OCS_VERSION)
-
-
-INCLUDES = -I $(OCS_DIR)/src
+INCLUDES = 
 OCAMLFLAGS = $(INCLUDES)
 OCAMLOPT = ocamlopt
 OCAMLC = ocamlc
 OCAMLDEP = ocamldep $(INCLUDES)
 OCAMLLIBS = unix.cma str.cma nums.cma
 
-bot: irc.cmo dispatch.cmo command.cmo iobuf.cmo cdb.cmo bot.cmo
-bot: $(OCS_DIR)/src/ocs.cma
+bot: irc.cmo dispatch.cmo command.cmo iobuf.cmo cdb.cmo bindings.cmo plugin.cmo infobot.cmo bot.cmo infobot.cmo
 	$(OCAMLC) -o $@ $(OCAMLLIBS) $^
-
-callback: callback.cmo
-callback: $(OCS_DIR)/src/ocs.cma
-	$(OCAMLC) -o $@ $(OCAMLLIBS) $^
-
-$(OCS_DIR)/src/ocs.cma $(OCS_DIR)/src/ocs.cmxa: $(OCS_DIR)
-	cd $(OCS_DIR)/src && make
 
 .PHONY: clean
 clean:
