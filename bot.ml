@@ -5,7 +5,7 @@ let choice l =
   let n = Random.int (List.length l) in
     List.nth l n
 
-let get_one key =
+let choose_one key =
   let matches = Cdb.get_matches info_db key in
   match Stream.npeek 120 matches with
     | [] -> raise Not_found
@@ -16,10 +16,24 @@ let write iobuf command args text =
     print_endline ("--> " ^ (Command.as_string cmd));
     Iobuf.write iobuf cmd
 
+let make_sandbox_env () =
+  let e = Ocs_env.top_env () in
+    Ocs_compile.bind_lang e;
+    Ocs_macro.bind_macro e;
+    Ocs_num.init e;
+    Ocs_numstr.init e;
+    Ocs_prim.init e;
+    Ocs_vector.init e;
+    Ocs_list.init e;
+    Ocs_char.init e;
+    Ocs_string.init e;
+    Ocs_contin.init e;
+    e
+
 let scheme_eval str =
   try
     let thread = Ocs_top.make_thread () in
-    let env = Ocs_top.make_env () in
+    let env = make_sandbox_env () in
     let inport = Ocs_port.open_input_string str in
     let outport = Ocs_port.open_output_string () in
     let lexer = Ocs_lex.make_lexer inport "interactive" in
@@ -35,7 +49,7 @@ let scheme_eval str =
 
 let handle_privmsg iobuf sender target text =
   try
-    let factoid = get_one text in
+    let factoid = choose_one text in
     let response = 
       match factoid.[0] with
         | ':' ->
@@ -43,7 +57,7 @@ let handle_privmsg iobuf sender target text =
         | '\\' ->
             Str.string_after factoid 1
         | _ ->
-            Printf.sprintf "Gosh, %s, I think %s is %s" sender text factoid
+            Printf.sprintf "I've heard that %s is %s" text factoid
     in
       write iobuf "PRIVMSG" [target] (Some response)
   with Not_found ->
