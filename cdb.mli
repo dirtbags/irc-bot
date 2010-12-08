@@ -32,7 +32,7 @@ type cdb_file = {
 val open_cdb_in : string -> cdb_file
 val close_cdb_in : cdb_file -> unit
 
-val get_matches : cdb_file -> string -> string Stream.t
+val get_matches : cdb_file -> string -> string list
 val find : cdb_file -> string -> string
 
 (*

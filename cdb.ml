@@ -127,7 +127,7 @@ let process_table cdc table_start slot_table slot_pointers i tc =
 		let rec find_where where =
                   match ht.(where) with
                     | None ->
-			where
+                        where
                     | _ ->
 			if ((where + 1) = len) then (find_where 0)
 			else (find_where (where + 1))
@@ -253,48 +253,48 @@ let open_cdb_in fn =
 let close_cdb_in cdf =
 	close_in cdf.f
 
-(** Get a stream of matches.
+(** Get a list of matches.
 
  @param cdf the cdb file
  @param key the key to search
  *)
 let get_matches cdf key =
-	let kh = hash key in
-	(* Find out where the hash table is *)
-	let hpos, hlen = cdf.tables.(hash_to_table kh) in
-	let rec loop x =
-		if(x >= hlen) then (
-			None
-		) else (
-			(* Calculate the slot containing these entries *)
-			let lslot = ((hash_to_bucket kh hlen) + x) mod hlen in
-			let spos = Int32.add (Int32.of_int (lslot * 8)) hpos in
-			LargeFile.seek_in cdf.f (Int64.of_int32 spos);
-			let h = read_le32 cdf.f in
-			let pos = read_le32 cdf.f in
-			(* validate that we a real bucket *)
-			if (h = kh) && ((Int32.compare pos Int32.zero) > 0) then (
-				LargeFile.seek_in cdf.f (Int64.of_int32 pos);
-				let klen = read_le cdf.f in
-				if (klen = String.length key) then (
-					let dlen = read_le cdf.f in
-					let rkey = String.create klen in
-					really_input cdf.f rkey 0 klen;
-					if(rkey = key) then (
-						let rdata = String.create dlen in
-						really_input cdf.f rdata 0 dlen;
-						Some(rdata)
-					) else (
-						loop (x + 1)
-					)
-				) else (
-					loop (x + 1)
-				)
-			) else (
-				loop (x + 1)
-			)
-		) in
-	Stream.from loop
+  let kh = hash key in
+    (* Find out where the hash table is *)
+  let hpos, hlen = cdf.tables.(hash_to_table kh) in
+  let rec loop x acc =
+    if (x >= hlen) then
+      acc
+    else
+      let acc' =
+        (* Calculate the slot containing these entries *)
+        let lslot = ((hash_to_bucket kh hlen) + x) mod hlen in
+        let spos = Int32.add (Int32.of_int (lslot * 8)) hpos in
+	let _ = LargeFile.seek_in cdf.f (Int64.of_int32 spos) in
+	let h = read_le32 cdf.f in
+	let pos = read_le32 cdf.f in
+	  (* validate that we a real bucket *)
+	  if (h = kh) && ((Int32.compare pos Int32.zero) > 0) then
+	    let _ = LargeFile.seek_in cdf.f (Int64.of_int32 pos) in
+	    let klen = read_le cdf.f in
+	      if (klen = String.length key) then
+		let dlen = read_le cdf.f in
+		let rkey = String.create klen in
+		  really_input cdf.f rkey 0 klen;
+		  if (rkey = key) then
+		    let rdata = String.create dlen in
+		      really_input cdf.f rdata 0 dlen;
+		      rdata :: acc
+                  else
+                    acc
+              else
+                acc
+          else
+            acc
+      in
+        loop (x + 1) acc'
+  in
+    List.rev (loop 0 [])
 
 (**
  Find the first record with the given key.
@@ -303,7 +303,8 @@ let get_matches cdf key =
  @param key the key to find
  *)
 let find cdf key =
-	try
-		Stream.next (get_matches cdf key)
-	with Stream.Failure ->
-		raise Not_found
+  match (get_matches cdf key) with
+    | [] ->
+        raise Not_found
+    | r :: _ ->
+        r
