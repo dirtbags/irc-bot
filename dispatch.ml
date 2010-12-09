@@ -22,7 +22,7 @@ type t = {
   timers : Timer.t ref;
 }
 
-let create size =
+let create ?(size=5) () =
   {read_fds = ref [];
    write_fds = ref [];
    except_fds = ref [];

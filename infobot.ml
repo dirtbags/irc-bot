@@ -39,7 +39,7 @@ let choose_one ib key =
     | keys ->
         choice keys
 
-let handle_privmsg store iobuf sender target text =
+let lookup store text =
   try
     let text, factoid =
       try
@@ -51,23 +51,12 @@ let handle_privmsg store iobuf sender target text =
           | Some stext ->
               (stext, choose_one store stext)
     in
-    let response = 
-      match factoid.[0] with
-        | ':' ->
-            "\001ACTION " ^ (Str.string_after factoid 1) ^ "\001"
-        | '\\' ->
-            Str.string_after factoid 1
-        | _ ->
-            Printf.sprintf "I overheard that %s is %s" text factoid
-    in
-      Iobuf.write iobuf (Command.create None "PRIVMSG" [target] (Some response))
+    match factoid.[0] with
+      | ':' ->
+        Some ("\001ACTION " ^ (Str.string_after factoid 1) ^ "\001")
+      | '\\' ->
+        Some (Str.string_after factoid 1)
+      | _ ->
+        Some (Printf.sprintf "I overheard that %s is %s" text factoid)
   with Not_found ->
-    ()
-
-let handle_command store iobuf cmd =
-  match Command.as_tuple cmd with
-    | (Some sender, "PRIVMSG", [target], Some text) ->
-        if Irc.is_channel target then
-          handle_privmsg store iobuf sender target text
-    | _ ->
-        ()
+    None
