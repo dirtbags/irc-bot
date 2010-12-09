@@ -1,19 +1,56 @@
-let info_db = Cdb.open_cdb_in "/home/neale/src/firebot/info.cdb"
+type t = {
+  filename: string;
+  mutable db: Cdb.cdb_file;
+}
+
 let _ = Random.self_init ()
+
+let create filename =
+  {
+    filename = filename;
+    db = Cdb.open_cdb_in filename;
+  }
 
 let choice l =
   let n = Random.int (List.length l) in
     List.nth l n
 
-let choose_one key =
-  let matches = Cdb.get_matches info_db key in
-  match Stream.npeek 120 matches with
-    | [] -> raise Not_found
-    | keys -> choice keys
+let strip s =
+  let rec lastchar n =
+    match s.[n-1] with
+      | '.'
+      | '!'
+      | '?'
+      | ' ' ->
+          lastchar (n - 1)
+      | _ ->
+          n
+  in
+  let len = lastchar (String.length s) in
+    if (len = String.length s) then
+      None
+    else
+      Some (String.sub s 0 len)
 
-let handle_privmsg iobuf sender target text =
+let choose_one ib key =
+  match (Cdb.get_matches ib.db key) with
+    | [] ->
+        raise Not_found
+    | keys ->
+        choice keys
+
+let handle_privmsg store iobuf sender target text =
   try
-    let factoid = choose_one text in
+    let text, factoid =
+      try
+        (text, choose_one store text)
+      with Not_found ->
+        match (strip text) with
+          | None ->
+              raise Not_found
+          | Some stext ->
+              (stext, choose_one store stext)
+    in
     let response = 
       match factoid.[0] with
         | ':' ->
@@ -21,20 +58,16 @@ let handle_privmsg iobuf sender target text =
         | '\\' ->
             Str.string_after factoid 1
         | _ ->
-            Printf.sprintf "I've heard that %s is %s" text factoid
+            Printf.sprintf "I overheard that %s is %s" text factoid
     in
       Iobuf.write iobuf (Command.create None "PRIVMSG" [target] (Some response))
   with Not_found ->
     ()
 
-let handle_command iobuf cmd =
-  print_endline ("<I- " ^ (Command.as_string cmd));
+let handle_command store iobuf cmd =
   match Command.as_tuple cmd with
     | (Some sender, "PRIVMSG", [target], Some text) ->
         if Irc.is_channel target then
-          handle_privmsg iobuf sender target text
+          handle_privmsg store iobuf sender target text
     | _ ->
         ()
-
-let _ = Plugin.register handle_command
-let _ = print_endline "========= INFOBOT"

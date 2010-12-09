@@ -22,14 +22,6 @@ type t = {
   timers : Timer.t ref;
 }
 
-(* select(), poll(), and epoll() treat timeout as an upper bound of time
-   to wait.  This fudge factor helps ensure that given no FD activity,
-   this isn't run in a tight loop as a timer approaches.  This value was
-   determined experimentally on a 1.25GHz G4 PPC to work most of the
-   time.  Your mileage may vary. *)
-
-let timeout_fudge = 0.001
-
 let create size =
   {read_fds = ref [];
    write_fds = ref [];
@@ -88,7 +80,7 @@ let delete_timer d time =
 
 
 let rec dispatch_timers d now =
-  if (!(d.timers) != Timer.empty) then
+  if not (Timer.is_empty !(d.timers)) then
     let (time, handler) = Timer.min_elt !(d.timers) in
       if now < time then
         ()
@@ -113,28 +105,29 @@ let rec dispatch_results d (read_ready, write_ready, except_ready) =
     dispatch Exception except_ready
 
 let once d =
-  let now = Unix.gettimeofday () in
-  let timeout =
+  (* You might think it'd work better to use the timeout of select().
+     Not so!  select() waits *at most* timeout ms.  Doing things
+     this way results in a tight loop as the timer approaches. *)
+  let interval = 
     try
-      let (time, _) = Timer.min_elt !(d.timers) in
-      let delta = (time -. now +. timeout_fudge) in
+      let (next, _) = Timer.min_elt !(d.timers) in
+      let delta = (next -. (Unix.gettimeofday ())) in
 	max delta 0.0
     with Not_found ->
-      (-1.0)
+      0.0
   in
-    (* select () waits *at most* timeout ms.  If you have fds but they're
-not
-       doing anything, multiple calls to once may be required.  This is
-       lame. *)
-  let result = Unix.select !(d.read_fds) !(d.write_fds) !(d.except_fds) timeout in
+  let s = { Unix.it_interval = interval; Unix.it_value = 0.0 } in
+  let _ = Sys.set_signal Sys.sigalrm Sys.Signal_ignore in
+  let _ = Unix.setitimer Unix.ITIMER_REAL s in
+  let result = Unix.select !(d.read_fds) !(d.write_fds) !(d.except_fds) (-1.0) in
     dispatch_results d result;
     dispatch_timers d (Unix.gettimeofday ())
 
-let rec run d =    
-  if ((!(d.handlers) == Fd_map.empty) &&
-        (!(d.timers) == Timer.empty)) then
+let rec run d =
+  if (Fd_map.is_empty !(d.handlers)) && (Timer.is_empty !(d.timers)) then
     ()
   else begin
     once d;
     run d
   end
+
