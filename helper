@@ -1,0 +1,28 @@
+#! /bin/sh
+
+sender=$1
+forum=$2
+
+read cmd args
+case $cmd in
+    .hi)
+        echo "Hi, ASL"
+        ;;
+    .date)
+        date
+        ;;
+    .msgme)
+        echo ":PRIVMSG $sender :hey baby"
+        ;;
+    .finger)
+        host="$(echo $args | cut -d@ -f 2)"
+        [ "$host" = "$args" ] && host=lanl.gov
+        echo $args | cut -d@ -f 1 | nc $host finger
+        ;;
+    .calc)
+        echo $args | bc -l
+        ;;
+    *)
+        echo "I'm sorry, $sender, I don't understand that command."
+        ;;
+esac
