@@ -6,7 +6,7 @@ let debug = prerr_endline
 
 let file_descr_of_int (i:int) =
   let blob = Marshal.to_string i [] in
-  (Marshal.from_string blob 0 : Unix.file_descr)
+    (Marshal.from_string blob 0 : Unix.file_descr)
 
 let write iobuf command args text =
   let cmd = Command.create None command args text in
@@ -89,11 +89,16 @@ let main () =
   let bot = {store = Infobot.create "info.cdb"} in
   let dispatcher = Dispatch.create () in
 
-  let iobuf_out = Iobuf.create dispatcher Unix.stdout "collab_out"
+  let conn_out, conn_in =
+    Process.spawn "socat" [|"socat";
+                            "STDIO";
+                            "OPENSSL:woozle.org:697,verify=0"|]
+  in
+  let iobuf_out = Iobuf.create dispatcher conn_out "collab_out"
     discard_command
     handle_error
   in
-  let _ = Iobuf.create dispatcher Unix.stdin "collab_in"
+  let _ = Iobuf.create dispatcher conn_in "collab_in"
     (handle_command bot iobuf_out)
     handle_error
   in
