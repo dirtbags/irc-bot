@@ -22,7 +22,7 @@ type t = {
   timers : Timer.t ref;
 }
 
-let create ?(size=5) () =
+let create () =
   {read_fds = ref [];
    write_fds = ref [];
    except_fds = ref [];
@@ -119,9 +119,14 @@ let once d =
   let s = { Unix.it_interval = interval; Unix.it_value = 0.0 } in
   let _ = Sys.set_signal Sys.sigalrm Sys.Signal_ignore in
   let _ = Unix.setitimer Unix.ITIMER_REAL s in
-  let result = Unix.select !(d.read_fds) !(d.write_fds) !(d.except_fds) (-1.0) in
-    dispatch_results d result;
-    dispatch_timers d (Unix.gettimeofday ())
+    try
+      let result =
+        Unix.select !(d.read_fds) !(d.write_fds) !(d.except_fds) (-1.0)
+      in
+        dispatch_results d result;
+        dispatch_timers d (Unix.gettimeofday ())
+    with Unix.Unix_error (Unix.EINTR, _, _) ->
+      ()
 
 let rec run d =
   if (Fd_map.is_empty !(d.handlers)) && (Timer.is_empty !(d.timers)) then

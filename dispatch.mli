@@ -10,9 +10,8 @@ type fd_handler = Unix.file_descr -> event -> unit
 type timer_handler = float -> unit
 (** [timer_handler d when] is called at or after [when] *)
 
-val create : ?size:int -> unit -> t
-(** Create a new event dispatcher, preallocating [size] fd events.
-    [size] is just a hint, the fd list will grow on demand. *)
+val create : unit -> t
+(** Create a new event dispatcher. *)
 
 val destroy : t -> unit
 (** Destroy an event dispatcher *)

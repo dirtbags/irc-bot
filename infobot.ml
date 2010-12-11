@@ -60,3 +60,11 @@ let lookup store text =
         Some (Printf.sprintf "I overheard that %s is %s" text factoid)
   with Not_found ->
     None
+
+
+let handle_privmsg store msg sender forum text =
+  match (lookup store text) with
+    | Some reply ->
+      msg reply
+    | None ->
+      ()

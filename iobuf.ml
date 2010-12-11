@@ -16,10 +16,12 @@ and error_handler = t -> string -> unit
 
 
 let ibuf_max = 4096
-let max_outq = 50
+let max_outq = 2000
 let obuf_max = 4096
 
 let name iobuf = iobuf.name
+
+let dispatcher iobuf = iobuf.d
 
 let crlf = Str.regexp "\r?\n"
 

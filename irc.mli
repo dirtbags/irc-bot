@@ -10,6 +10,7 @@ val uppercase : string -> string
 val lowercase : string -> string
 val truncate : string -> int -> string
 
+val nuhost_of_string : string -> nuhost
 val string_of_nuhost : nuhost -> string
 val nick : nuhost -> string
 val user : nuhost -> string

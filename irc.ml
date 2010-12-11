@@ -49,7 +49,17 @@ let truncate s len =
     else
       Str.string_before s (min slen len)
 
-let string_of_nuhost (nick, user, host) = nick ^ "!" ^ user ^ "@" ^ host
+let nuhost_re = Str.regexp "\\(.*\\)!\\(.*\\)@\\(.*\\)"
+let nuhost_of_string str =
+  if Str.string_match nuhost_re str 0 then
+    (Str.matched_group 1 str,
+     Str.matched_group 2 str,
+     Str.matched_group 3 str)
+  else
+    raise Not_found
+  
+let string_of_nuhost (nick, user, host) =
+  nick ^ "!" ^ user ^ "@" ^ host
 let nick (nick, user, host) = nick
 let user (nick, user, host) = user
 let host (nick, user, host) = host

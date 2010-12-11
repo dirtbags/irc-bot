@@ -8,8 +8,13 @@ case $cmd in
     .hi)
         echo "Hi, ASL"
         ;;
-    .date)
-        date
+    .time)
+        if [ -n "$args" ]; then
+            a=$(echo $args | awk '{print "-d " $1}')
+        fi
+        echo $(date $a +%s) --- \
+            $(date $a --rfc-3339=seconds) --- \
+            $(date $a --utc --rfc-3339=seconds)
         ;;
     .msgme)
         echo ":PRIVMSG $sender :hey baby"
@@ -20,7 +25,12 @@ case $cmd in
         echo $args | cut -d@ -f 1 | nc $host finger
         ;;
     .calc)
-        echo $args | bc -l
+        echo $args | (echo -n "$args = "; bc -l)
+        ;;
+    .units)
+        a=$(echo $args | sed 's/->.*//')
+        b=$(echo $args | sed 's/.*->//')
+        units -v "$a" "$b"
         ;;
     *)
         echo "I'm sorry, $sender, I don't understand that command."
