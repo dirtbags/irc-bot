@@ -1,7 +1,3 @@
-type bot = {
-  store: Infobot.t;
-}
-
 let debug = prerr_endline
 
 let file_descr_of_int (i:int) =
@@ -10,7 +6,6 @@ let file_descr_of_int (i:int) =
 
 let write iobuf command args text =
   let cmd = Command.create None command args text in
-    debug ("--> " ^ (Command.as_string cmd));
     Iobuf.write iobuf cmd
 
 let msg iobuf recip text =
@@ -48,11 +43,68 @@ let extern_callback iobuf sender forum text =
   in
     f lines
 
-let handle_privmsg bot iobuf sender forum text =
-  if text.[0] == '.' then
+let nick_of_nuhost s =
+  try
+    Irc.nick (Irc.nuhost_of_string s)
+  with Not_found ->
+    s
+    
+let handle_command outbuf handle_cmd thisbuf cmd =
+  let (prefix, command, args, trailing) = Command.as_tuple cmd in
+  let (sender, forum) =
+    match (prefix, command, args, trailing) with
+      | (Some suhost, "PRIVMSG", [target], _)
+      | (Some suhost, "NOTICE", [target], _) ->
+          let sender = nick_of_nuhost suhost in
+          let forum = if Irc.is_channel target then target else sender in
+            (sender, forum)
+
+(* Here's why the IRC protocol blows: *)
+      | (Some suhost, "PART", [forum], _)
+      | (Some suhost, "JOIN", [forum], _)
+      | (Some suhost, "MODE", forum :: _, _)
+      | (Some suhost, "INVITE", _, Some forum)
+      | (Some suhost, "TOPIC", forum :: _, _)
+      | (Some suhost, "KICK", forum :: _, _) ->
+          (nick_of_nuhost suhost, forum)
+
+      | (Some suhost, "JOIN", [], Some chan) ->
+          (nick_of_nuhost suhost, chan)
+
+      | (Some _, "NICK", [sender], _) ->
+          (sender, sender)
+
+      | (Some suhost, "QUIT", _, _)
+      | (Some suhost, _, _, _) ->
+          let sender = nick_of_nuhost suhost in
+            (sender, sender)
+
+      | (_, "PING", _, Some text) ->
+          write outbuf "PONG" [] (Some text);
+          ("", "")
+
+      | (None, _, _, _) ->
+          ("", "")
+  in
+  let pfx =
+    match prefix with
+      | Some txt -> txt
+      | None -> ""
+  in
+  let text =
+    match trailing with
+      | Some txt -> txt
+      | None -> ""
+  in
+  let argv =
+    Array.append
+      [|handle_cmd; sender; forum; pfx; command|]
+      (Array.of_list args)
+  in
     Process.create_canned
-      (Iobuf.dispatcher iobuf)
+      (Iobuf.dispatcher thisbuf)
       text
+<<<<<<< master:bot.ml
       (extern_callback iobuf sender forum)
       "./helper"
       [|"./helper"; sender; forum|]
@@ -79,6 +131,12 @@ let handle_command bot outbuf thisbuf cmd =
         msg outbuf chan "hi asl"
     | _ ->
         ()
+=======
+      (extern_callback outbuf sender forum)
+      handle_cmd
+      argv
+
+>>>>>>> local:bot.ml
 
 let discard_command iobuf cmd = ()
 
@@ -86,6 +144,7 @@ let handle_error iobuf str =
   prerr_endline ("!!! " ^ str)
 
 let main () =
+<<<<<<< master:bot.ml
   let bot = {store = Infobot.create "info.cdb"} in
   let dispatcher = Dispatch.create () in
 
@@ -93,19 +152,48 @@ let main () =
     Process.spawn "socat" [|"socat";
                             "STDIO";
                             "OPENSSL:woozle.org:697,verify=0"|]
+=======
+  let handler = ref "/bin/true" in
+  let inputfn = ref "" in
+  let nick = ref "bot" in
+  let user = ref "bot" in
+  let mode = ref "+i" in
+  let realname = ref "I'm a little printf, short and stdout" in
+  let connect = ref [||] in
+  let append_connect s = connect := Array.append !connect [|s|] in
+  let speclist =
+    [
+      ("-n", Arg.Set_string nick, "Nickname");
+      ("-u", Arg.Set_string user, "Username");
+      ("-m", Arg.Set_string mode, "Mode");
+      ("-r", Arg.Set_string realname, "Real name");
+      ("-a", Arg.Set_string handler, "IRC message handler");
+      ("-i", Arg.Set_string inputfn, "Command FIFO");
+    ]
+>>>>>>> local:bot.ml
   in
-  let iobuf_out = Iobuf.create dispatcher conn_out "collab_out"
-    discard_command
-    handle_error
-  in
-  let _ = Iobuf.create dispatcher conn_in "collab_in"
-    (handle_command bot iobuf_out)
-    handle_error
-  in
-    write iobuf_out "NICK" ["zinc"] None;
-    write iobuf_out "USER" ["zinc"; "zinc"; "zinc"] (Some "I'm a little printf, short and stdout");
-    Dispatch.run dispatcher
-    
+  let usage = "usage: bot [OPTIONS] CONNECT-COMMAND [ARGS ...]" in
+    Arg.parse speclist append_connect usage;
+    if (Array.length !connect) < 1 then begin
+      prerr_endline "Error: must specify connect command.";
+      prerr_endline "";
+      prerr_endline "Run with --help for usage information.";
+      exit 64                           (* EX_USAGE *)
+    end;
+
+    let dispatcher = Dispatch.create () in
+    let conn_out, conn_in = Process.spawn (!connect).(0) !connect in
+    let iobuf_out = Iobuf.create dispatcher conn_out "out"
+      discard_command
+      handle_error
+    in
+    let _ = Iobuf.create dispatcher conn_in "in"
+      (handle_command iobuf_out !handler)
+      handle_error
+    in
+      write iobuf_out "NICK" [!nick] None;
+      write iobuf_out "USER" [!user; !mode; "merf"] (Some !realname);
+      Dispatch.run dispatcher
 
 let _ =
   main ()
