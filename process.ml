@@ -8,6 +8,7 @@ let spawn prog args =
           Unix.close fd0_exit;
 
           Unix.dup2 fd1_entr Unix.stdout;
+          Unix.dup2 fd1_entr Unix.stderr;
           Unix.close fd1_entr;
           Unix.close fd1_exit;
 
@@ -53,21 +54,15 @@ let canned_handler d p fd event =
             p.finished (String.sub p.stdout 0 p.stdout_pos)
           end
     | Dispatch.Output ->
-        begin
-          try
-            let len =
-              Unix.write fd p.stdin p.stdin_pos
-                ((String.length p.stdin) - p.stdin_pos)
-            in
-              p.stdin_pos <- p.stdin_pos + len;
-              if (p.stdin_pos == String.length p.stdin) then begin
-                Unix.close fd;
-                Dispatch.delete d fd
-              end
-          with Unix.Unix_error _ ->
+        let len =
+          Unix.write fd p.stdin p.stdin_pos
+            ((String.length p.stdin) - p.stdin_pos)
+        in
+          p.stdin_pos <- p.stdin_pos + len;
+          if (p.stdin_pos == String.length p.stdin) then begin
             Unix.close fd;
             Dispatch.delete d fd
-        end
+          end
     | Dispatch.Exception ->
         ()
 
@@ -100,9 +95,6 @@ let rec sigchld s =
   with Unix.Unix_error (Unix.ECHILD, _, _) ->
     ()
 
-let sigpipe s = ()
-
 let _ =
-  Sys.set_signal Sys.sigchld (Sys.Signal_handle sigchld);
-  Sys.set_signal Sys.sigpipe (Sys.Signal_handle sigpipe)
+  Sys.set_signal Sys.sigchld (Sys.Signal_handle sigchld)
 
