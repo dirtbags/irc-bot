@@ -1,0 +1,24 @@
+#! /bin/sh
+
+sender=$1;  export sender;  shift
+forum=$1;   export forum;   shift
+prefix=$1;  export prefix;  shift
+command=$1; export command; shift
+# $* is now args
+text=$(cat)
+
+case $command in
+    001)
+        printf '\aJOIN #woozle\n'
+        printf '\aJOIN #foozle\n'
+        printf '\aJOIN #bot\n'
+        ;;
+    PRIVMSG)
+        ./firebot "$text" || \
+            ./infobot woozle.cdb "$text"
+        ;;
+    INVITE)
+        printf '\aJOIN %s\n' "$forum"
+        ;;
+esac
+

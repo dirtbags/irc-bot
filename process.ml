@@ -8,7 +8,6 @@ let spawn prog args =
           Unix.close fd0_exit;
 
           Unix.dup2 fd1_entr Unix.stdout;
-          Unix.dup2 fd1_entr Unix.stderr;
           Unix.close fd1_entr;
           Unix.close fd1_exit;
 

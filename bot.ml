@@ -31,7 +31,7 @@ let extern_callback iobuf sender forum text =
     | "" :: tl ->
         f tl
     | line :: tl ->
-        if line.[0] == ':' then
+        if line.[0] == '\007' then
           (* Interpret as raw IRC commands *)
           let ine = Str.string_after line 1 in
           let cmd = Command.from_string ine in
@@ -63,6 +63,7 @@ let handle_command outbuf handle_cmd thisbuf cmd =
       | (Some suhost, "PART", [forum], _)
       | (Some suhost, "JOIN", [forum], _)
       | (Some suhost, "MODE", forum :: _, _)
+      | (Some suhost, "INVITE", [_; forum], None)
       | (Some suhost, "INVITE", _, Some forum)
       | (Some suhost, "TOPIC", forum :: _, _)
       | (Some suhost, "KICK", forum :: _, _) ->

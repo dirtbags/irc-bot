@@ -5,7 +5,7 @@ OCAMLC = ocamlc -g
 OCAMLDEP = ocamldep $(INCLUDES)
 OCAMLLIBS = unix.cma str.cma nums.cma
 
-bot: irc.cmo dispatch.cmo process.cmo command.cmo iobuf.cmo cdb.cmo bindings.cmo infobot.cmo bot.cmo infobot.cmo
+bot: irc.cmo dispatch.cmo process.cmo command.cmo iobuf.cmo bot.cmo
 	$(OCAMLC) -o $@ $(OCAMLLIBS) $^
 
 .PHONY: clean

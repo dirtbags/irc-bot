@@ -1,0 +1,37 @@
+#! /bin/sh
+
+firebot () {
+    read cmd args
+    case $cmd in
+        calc)
+            printf "%s = " "$args"
+            echo "$args" | bc -l
+            ;;
+        units)
+            src=$(echo "$args" | sed 's/ ->.*//')
+            dst=$(echo "$args" | sed 's/.*-> //')
+            units -1 -v -- "$src" "$dst"
+            ;;
+        .note)
+            who=$(echo $args | cut -d\  -f1 | tr -d -c A-Za-z0-9)
+            what=$(echo $args | cut -d\  -f2-)
+            when=$(date)
+            echo "($when) <$sender> $what" > notes/$who
+            echo "I've left $who a note, $sender."
+            ;;
+        *)
+            exit 1
+            ;;
+    esac
+}
+
+if [ -f notes/$sender ]; then
+    echo "Welcome back, $sender.  Your messages:"
+    cat notes/$sender
+    rm notes/$sender
+fi
+
+echo "$1" | firebot
+
+
+

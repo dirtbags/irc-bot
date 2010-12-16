@@ -35,10 +35,9 @@ EOF
         cdb -s $db | head -n 1
         ;;
     !l*)
-        printf "%s is:" "$args"
-        cdb -q -m $db "$args" | while read v; do
-            printf " \"%s\" |" "$v"
-        done
+        printf "%s" "$args"
+        cdb -q -m $db "$args" | \
+            awk '{printf(" | \"%s\"", $0);}'
         echo
         ;;
     !a*)
@@ -46,40 +45,35 @@ EOF
         val=$(printf "%s" "$args" | sed 's/.*+= //')
         (printf "+%d,%d:%s->%s\n" ${#key} ${#val} "$key" "$val";
             cdb -d $db) | cdb -c $db
+        echo "Okay, $sender, I added a factoid to $key"
         ;;
     !r*)
         key=$(printf "%s" "$args" | sed 's/ -=.*//')
         val=$(printf "%s" "$args" | sed 's/.*-= //')
-        gs=":$key->.*$val"
-        case $(cdb -d $db | grep -c "$gs") in
-            0)
-                echo 'No matches'
-                ;;
-            1)
-                cdb -d $db | grep -v "$gs" | cdb -c $db
-                echo "I removed $val from $key"
-                ;;
-            *)
-                echo 'That maches more than one entry; please refine your request'
-                ;;
-        esac
+        re=":$key->.*$val"
+        n=$(cdb -d $db | grep -c "$re")
+        if [ $n -gt 0 ]; then
+            cdb -d $db | grep -a -v ":$key->.*$val" | cdb -c $db
+            echo "Okay, $sender, I removed $n factoids from $key"
+        else
+            echo "Nothing matched, $sender."
+        fi
         ;;
     !f*)
-        cdb -d $db | fgrep -v ":$args->" | cdb -c $db
-        echo "I forgot $args"
+        cdb -d $db | grep -a -F -v ":$args->" | cdb -c $db
+        echo "I removed all factoids from $args"
         ;;
     *)
         resp=$(lookup "$text" | shuf -n 1 | sed "s/\$sender/$sender/")
         case "$resp" in
             "")
+                exit 1
                 ;;
             \\*)
-                echo "$resp" | cut -b2-
+                printf "%s" "$resp" | cut -b2-
                 ;;
             :*)
-                echo -ne '\001ACTION '
-                echo -n $(echo "$resp" | cut -b2-)
-                echo -e '\001'
+                printf '\001ACTION %s\001\n' "$(echo "$resp" | cut -b2-)"
                 ;;
             *)
                 echo "It's been said that $text is $resp"
