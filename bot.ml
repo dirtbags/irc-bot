@@ -104,39 +104,10 @@ let handle_command outbuf handle_cmd thisbuf cmd =
     Process.create_canned
       (Iobuf.dispatcher thisbuf)
       text
-<<<<<<< master:bot.ml
-      (extern_callback iobuf sender forum)
-      "./helper"
-      [|"./helper"; sender; forum|]
-  else
-    Infobot.handle_privmsg bot.store (msg iobuf forum) sender forum text
-
-let handle_command bot outbuf thisbuf cmd =
-  debug ("<-- " ^ (Command.as_string cmd));
-  match (Command.as_tuple cmd) with
-    | (Some suhost, "PRIVMSG", [target], Some text) ->
-        let sender = Irc.nick (Irc.nuhost_of_string suhost) in
-        let forum =
-          if Irc.is_channel target then
-            target
-          else
-            sender
-        in
-          handle_privmsg bot outbuf sender forum text
-    | (_, "PING", _, text) ->
-        write outbuf "PONG" [] text
-    | (_, "001", _, _) ->
-        write outbuf "JOIN" ["#bot"] None;
-    | (Some sender, "JOIN", [], Some chan) ->
-        msg outbuf chan "hi asl"
-    | _ ->
-        ()
-=======
       (extern_callback outbuf sender forum)
       handle_cmd
       argv
 
->>>>>>> local:bot.ml
 
 let discard_command iobuf cmd = ()
 
@@ -144,15 +115,6 @@ let handle_error iobuf str =
   prerr_endline ("!!! " ^ str)
 
 let main () =
-<<<<<<< master:bot.ml
-  let bot = {store = Infobot.create "info.cdb"} in
-  let dispatcher = Dispatch.create () in
-
-  let conn_out, conn_in =
-    Process.spawn "socat" [|"socat";
-                            "STDIO";
-                            "OPENSSL:woozle.org:697,verify=0"|]
-=======
   let handler = ref "/bin/true" in
   let inputfn = ref "" in
   let nick = ref "bot" in
@@ -170,7 +132,6 @@ let main () =
       ("-a", Arg.Set_string handler, "IRC message handler");
       ("-i", Arg.Set_string inputfn, "Command FIFO");
     ]
->>>>>>> local:bot.ml
   in
   let usage = "usage: bot [OPTIONS] CONNECT-COMMAND [ARGS ...]" in
     Arg.parse speclist append_connect usage;
