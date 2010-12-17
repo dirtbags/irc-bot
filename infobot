@@ -37,7 +37,7 @@ EOF
     !l*)
         printf "%s" "$args"
         cdb -q -m $db "$args" | \
-            awk '{printf(" | \"%s\"", $0);}'
+            awk '{printf("¦\"%s\"", $0);}'
         echo
         ;;
     !a*)

@@ -8,8 +8,20 @@ let write iobuf command args text =
   let cmd = Command.create None command args text in
     Iobuf.write iobuf cmd
 
-let msg iobuf recip text =
-  write iobuf "PRIVMSG" [recip] (Some text)
+let rec msg iobuf recip text =
+  match text with
+    | "" -> ()
+    | _ ->
+      let tl = String.length text in
+      let s, rest = 
+        if (tl > 400) then
+          ((Str.string_before text 400) ^ "↩",
+           "↪" ^ (Str.string_after text 400))
+        else
+          (text, "")
+      in
+        write iobuf "PRIVMSG" [recip] (Some s);
+        msg iobuf recip rest
 
 let split = Str.split (Str.regexp "[ \t]*\r?\n")
 
