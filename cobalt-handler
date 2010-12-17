@@ -20,10 +20,10 @@ case $command in
     PRIVMSG)
         case "$forum" in
             \#*)
-                ./notes woozle/notes "$text"
                 ./firebot "$text" || \
                     ./whuffie woozle/whuffie.cdb "$text" || \
                     ./infobot woozle/factoids.cdb "$text"
+                ./notes woozle/notes "$text"
                 ;;
         esac
         ;;
