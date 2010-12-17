@@ -16,7 +16,7 @@ case "$text" in
         what=${args#* }
         when=$(date)
         
-        echo "($when) <$sender> $what" >> $db/$who
+        echo "($when) <$prefix> $what" >> $db/$who
         echo "Okay, $sender, I've left $who a note."
         ;;
 esac
