@@ -1,0 +1,22 @@
+#! /bin/sh
+
+db=$1; shift
+text=$1
+
+if [ -f $db/$sender ]; then
+    echo "Welcome back, $sender.  Your messages:"
+    cat $db/$sender
+    rm $db/$sender
+fi
+
+case "$text" in 
+    .note\ *)
+        args=${text#.note }
+        who=${args%% *}
+        what=${args#* }
+        when=$(date)
+        
+        echo "($when) <$sender> $what" >> $db/$who
+        echo "Okay, $sender, I've left $who a note."
+        ;;
+esac

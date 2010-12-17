@@ -12,24 +12,11 @@ firebot () {
             dst=$(printf "%s" "$args" | sed 's/.*-> //')
             units -1 -v -- "$src" "$dst"
             ;;
-        .note)
-            who=$(printf "%s" "$args" | sed 's/ .*//;s/[^-A-Za-z0-9]/./')
-            what=$(printf "%s" "$args" | cut -d\  -f2-)
-            when=$(date)
-            echo "($when) <$sender> $what" > notes/$who
-            echo "I've left $who a note, $sender."
-            ;;
         *)
             exit 1
             ;;
     esac
 }
-
-if [ -f notes/$sender ]; then
-    echo "Welcome back, $sender.  Your messages:"
-    cat notes/$sender
-    rm notes/$sender
-fi
 
 echo "$1" | firebot
 
