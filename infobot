@@ -1,10 +1,6 @@
 #! /bin/sh
 
-if [ $# -gt 1 ]; then
-    db=$1; shift
-else
-    db=info.cdb
-fi
+db=$1; shift
 text="$1"
 args=$(echo "$text" | cut -d\  -f2-)
 

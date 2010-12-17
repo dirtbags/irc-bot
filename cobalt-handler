@@ -14,8 +14,13 @@ case $command in
         printf '\aJOIN #bot\n'
         ;;
     PRIVMSG)
-        ./firebot "$text" || \
-            ./infobot woozle.cdb "$text"
+        case "$forum" in
+            \#woozle|\#foozle)
+                ./firebot "$text" || \
+                    ./whuffie woozle.whuffie.cdb "$text" || \
+                    ./infobot woozle.factoids.cdb "$text"
+                ;;
+        esac
         ;;
     INVITE)
         printf '\aJOIN %s\n' "$forum"
