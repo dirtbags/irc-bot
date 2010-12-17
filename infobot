@@ -65,6 +65,9 @@ EOF
             "")
                 exit 1
                 ;;
+            \\*)
+                echo "Someone's up to no good!"
+                ;;
             \\*)
                 printf "%s" "$resp" | cut -b2-
                 ;;

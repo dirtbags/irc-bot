@@ -7,15 +7,19 @@ command=$1; export command; shift
 # $* is now args
 text=$(cat)
 
+join () {
+    printf '\aJOIN %s\n' "$1"
+}
+
 case $command in
     001)
-        printf '\aJOIN #woozle\n'
-        printf '\aJOIN #foozle\n'
-        printf '\aJOIN #bot\n'
+        join "#woozle"
+        join "#foozle"
+        join "#bot"
         ;;
     PRIVMSG)
         case "$forum" in
-            \#woozle|\#foozle)
+            \#*)
                 ./firebot "$text" || \
                     ./whuffie woozle.whuffie.cdb "$text" || \
                     ./infobot woozle.factoids.cdb "$text"
@@ -23,7 +27,8 @@ case $command in
         esac
         ;;
     INVITE)
-        printf '\aJOIN %s\n' "$forum"
+        join "$forum"
+        echo "Thanks for the invitation, $sender."
         ;;
 esac
 
