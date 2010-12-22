@@ -1,7 +1,9 @@
 #! /bin/sh
 
-exec ./bot \
-    -n cobalt \
-    -u cobalt \
-    -a ./cobalt-handler \
-    socat STDIO OPENSSL:woozle.org:994,verify=0
+while true; do
+    ./bot \
+	-n cobalt \
+	-u cobalt \
+	-a ./cobalt-handler \
+	socat STDIO OPENSSL:woozle.org:6697,verify=0
+done

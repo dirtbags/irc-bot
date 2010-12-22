@@ -5,7 +5,10 @@ forum=$1;   export forum;   shift
 prefix=$1;  export prefix;  shift
 command=$1; export command; shift
 # $* is now args
-text=$(cat)
+
+# Remeber, read discards leading whitespace.  If that's not okay, use
+# text=$(cat)
+read -r text
 
 join () {
     printf '\aJOIN %s\n' "$1"
