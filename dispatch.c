@@ -173,10 +173,8 @@ call_with_lines(char   *buf,
 
   while ((p = memchr(b, '\n', l))) {
     size_t n = p - b + 1;
-    size_t buflen = n;
 
-    if ('\r' == *(p-1)) buflen -= 1;
-    func(b, buflen);
+    func(b, n);
     l -= n;
     b += n;
   }

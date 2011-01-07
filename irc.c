@@ -65,6 +65,10 @@ main(int argc, char *argv[])
         line += 1;
       }
     }
+
+    /* Strip trailing carriage return */
+    while (*line) line += 1;
+    if ('\r' == *(line-1)) *(line-1) = '\0';
   }
 
   /* Set command, converting to upper case */
@@ -108,7 +112,8 @@ main(int argc, char *argv[])
     sender = parts[1];
     forum = sender;
   } else if (0 == strcmp(cmd, "PING")) {
-    dprintf(1, "PONG :%s\r\n", text);
+    printf("PONG :%s\r\n", text);
+    fflush(stdout);
   }
 
   {
