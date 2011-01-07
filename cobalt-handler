@@ -41,7 +41,6 @@ case $command in
         raw "PRIVMSG %s :Thanks for the invitation, %s." "$forum" "$sender"
         ;;
 esac | while read -r line; do
-    echo $line 1>&2
     case "$line" in
         *)
             printf "%s\r\n" "${line#}"
