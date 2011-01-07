@@ -108,7 +108,8 @@ main(int argc, char *argv[])
     sender = parts[1];
     forum = sender;
   } else if (0 == strcmp(cmd, "PING")) {
-    dprintf(1, "PONG :%s\r\n", text);
+    printf("PONG :%s\r\n", text);
+    fflush(stdout);
   }
 
   {
