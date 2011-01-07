@@ -1,13 +1,85 @@
 bot
 ===
 
-It's a bot with a scheme interpreter in it.
+This is a suite of simple programs which allow you to write an IRC bot.
+It is based on the Unix principle that one program should do one thing,
+and makes extensive use of pipes, child processes, and passing of file
+descriptors.
+
+Unless you are a seasoned Unix programmer or are willing to become one,
+this is not the bot you're looking for.
 
 
-Downloading
------------
+dispatch
+--------
 
-http://woozle.org/~neale/gitweb.cgi
+Reads lines from stdin (or fd 6).  Each line causes a fork and exec of a
+specified program; the line is sent as the last argument.  Any output
+from children is passed through to stdout (or fd 7), optionally rate
+limited.  A fifo can optionally be specified on the command line;
+anything written to it is treated identically to child output.
+
+
+irc
+---
+
+Parses its last argument as a line from IRC.  Determines prefix,
+command, sender, forum (channel or user), and text; then invokes a
+specified program with these as arguments.  Also responds to server
+pings as a convenience.
+
+
+bot
+---
+
+Given nickname $nick, creates $nick.fifo, logs into IRC as $nick, and
+passes control to dispatch -> irc -> $nick-handler.
+
+
+cobalt-handler
+--------------
+
+Joins initial channels, responds to invite messages, and tries private
+messages with several different handlers in turn.
+
+
+firebot
+-------
+
+A private message handler providing a few handy commands.
+
+
+infobot
+-------
+
+A private message handler providing infobot-like functionality.
+
+
+notes
+-----
+
+A private message handler allowing users to leave notes for each other.
+
+
+whuffie
+-------
+
+A private message handler keeping track of whuffe (also known as karma),
+which is really just a meaningless number associated with your nick,
+which other people can manipulate but you can't.
+
+
+
+Putting it all together
+=======================
+
+A full chain of programs would look something like
+
+    tcpclient -> bot -> dispatch -> handler
+
+and would be invoked as
+
+    $ tcpclient irc.host.org 6667 ./bot cobalt
 
 
 Author

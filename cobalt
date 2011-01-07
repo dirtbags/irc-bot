@@ -1,9 +1,6 @@
 #! /bin/sh
 
 while true; do
-    ./bot \
-	-n cobalt \
-	-u cobalt \
-	-a ./cobalt-handler \
-	socat STDIO OPENSSL:woozle.org:6697,verify=0
+    tcpclient woozle.org 6667 ./bot cobalt
+    sleep 5
 done

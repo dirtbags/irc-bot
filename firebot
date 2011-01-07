@@ -1,23 +1,18 @@
 #! /bin/sh
 
 cmd=${1%% *}
-args=${1#* }
+[ "$cmd" = "$1" ] || args=${1#* }
 case $cmd in
-    calc)
+    .calc)
         printf "%s = " "$args"
-        printf "%s\n" "$args" | bc -l
+        echo "$args" | bc -l
         ;;
-    units)
-	src=${args% ->*}
-	dst=${args#*-> }
+    .units)
+        src=$(printf "%s" "$args" | sed 's/ ->.*//')
+        dst=$(printf "%s" "$args" | sed 's/.*-> //')
         units -1 -v -- "$src" "$dst"
         ;;
     *)
         exit 1
         ;;
 esac
-
-
-
-
-

@@ -1,24 +1,30 @@
 #! /bin/sh
 
+pfx=$1;     export pfx;     shift
+command=$1; export command; shift
 sender=$1;  export sender;  shift
 forum=$1;   export forum;   shift
-prefix=$1;  export prefix;  shift
-command=$1; export command; shift
+text=$1;    export text;    shift
 # $* is now args
 
-# Remeber, read discards leading whitespace.  If that's not okay, use
-# text=$(cat)
-read -r text
+# Debug output
+echo '>>>' ${pfx:+:}$pfx $command "$@" ${text:+:}"$text" 1>&2
+
+raw () {
+    fmt="\007$1\n"; shift
+    printf "$fmt" "$@"
+}
 
 join () {
-    printf '\aJOIN %s\n' "$1"
+    raw "JOIN $1"
 }
 
 case $command in
     001)
-        join "#woozle"
-        join "#foozle"
-        join "#bot"
+        join "#cobalt"
+        ;;
+    433)
+        raw "NICK bottimus"
         ;;
     PRIVMSG)
         case "$forum" in
@@ -32,7 +38,16 @@ case $command in
         ;;
     INVITE)
         join "$forum"
-        echo "Thanks for the invitation, $sender."
+        raw "PRIVMSG %s :Thanks for the invitation, %s." "$forum" "$sender"
         ;;
-esac
+esac | while read -r line; do
+    case "$line" in
+        *)
+            printf "%s\r\n" "${line#}"
+            ;;
+        *)
+            printf "PRIVMSG %s :%s\r\n" "$forum" "$line"
+            ;;
+    esac
+done
 

@@ -69,7 +69,7 @@ EOF
                 echo "Someone's up to no good!"
                 ;;
             '\'*)
-                printf "%s" "${resp#\\}"
+                printf "%s\n" "${resp#\\}"
                 ;;
             :*)
                 printf '\001ACTION %s\001\n' "${resp#:}"
