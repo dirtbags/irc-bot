@@ -1,0 +1,9 @@
+#! /bin/sh
+
+(
+    # UCSPI wants input on FD 7, and sets $PROTO
+    [ -n "$PROTO" ] && exec 1>&7
+    echo "NICK $1"
+    echo "USER $1 $1 $1 :I'm a little printf, short and stdout."
+)
+exec ./dispatch ./irc ./$1-handler

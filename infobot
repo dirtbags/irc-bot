@@ -2,6 +2,8 @@
 
 db=$1; shift
 text="$1"
+cmd=${text%% *}
+args=${text#* }
 
 lookup () {
     if ! cdb -q -m $db "$1"; then
@@ -16,7 +18,7 @@ lookup () {
     fi
 }
 
-case "$text" in
+case "$cmd" in
     !h*)
         cat <<EOF
 !stats                       Show statistics
@@ -30,23 +32,20 @@ EOF
         cdb -s $db | head -n 1
         ;;
     !l*)
-        args=$(echo "$text" | cut -d\  -f2-)
         printf "factoids for \"%s\": " "$args"
         cdb -q -m $db "$args" | awk '{printf("|%s", $0);}'
         echo
         ;;
     !a*)
-        args=$(echo "$text" | cut -d\  -f2-)
-        key=$(printf "%s" "$args" | sed 's/ +=.*//')
-        val=$(printf "%s" "$args" | sed 's/.*+= //')
+	key=${args% +=*}
+	val=${args#*+= }
         (printf "+%d,%d:%s->%s\n" ${#key} ${#val} "$key" "$val";
             cdb -d $db) | cdb -c $db
         echo "Okay, $sender, I added a factoid to $key"
         ;;
     !r*)
-        args=$(echo "$text" | cut -d\  -f2-)
-        key=$(printf "%s" "$args" | sed 's/ -=.*//')
-        val=$(printf "%s" "$args" | sed 's/.*-= //')
+	key=${args% -=*}
+	val=${args#*-= }
         re=":$key->.*$val"
         n=$(cdb -d $db | grep -c "$re")
         if [ $n -gt 0 ]; then
@@ -56,8 +55,7 @@ EOF
             echo "Nothing matched, $sender."
         fi
         ;;
-    !forget\ *)
-        args=$(echo "$text" | cut -d\  -f2-)
+    !forget)
         cdb -d $db | grep -a -F -v ":$args->" | cdb -c $db
         echo "I removed all factoids from $args"
         ;;
@@ -67,10 +65,10 @@ EOF
             "")
                 exit 1
                 ;;
-            \\*)
+            ''*)
                 echo "Someone's up to no good!"
                 ;;
-            \\*)
+            '\'*)
                 printf "%s\n" "${resp#\\}"
                 ;;
             :*)
