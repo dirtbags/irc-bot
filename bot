@@ -1,0 +1,5 @@
+#! /bin/sh
+
+echo "NICK $1" 1>&6
+echo "USER $1 $1 $1 :I'm a little printf, short and stdout." 1>&6
+exec ./dispatch ./irc ./$1-handler

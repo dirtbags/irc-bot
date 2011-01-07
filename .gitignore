@@ -1,6 +1,5 @@
-*.cmi
-*.cmo
+*.o
 *~
-bot
-.omake*
-.depend
+dispatch
+irc
+
