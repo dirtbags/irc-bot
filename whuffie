@@ -23,7 +23,7 @@ adj () {
 
 
 case "$text" in
-    whuffie\ *)
+    .whuffie\ *)
         who=${text##whuffie }
         amt=$(get "$who")
         echo "$who has whuffie score of $amt"
