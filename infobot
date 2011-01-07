@@ -63,6 +63,7 @@ EOF
         ;;
     *)
         resp=$(lookup "$text" | shuf -n 1 | sed "s/\$sender/$sender/")
+        echo "resp: $resp" 1>&2
         case "$resp" in
             "")
                 exit 1

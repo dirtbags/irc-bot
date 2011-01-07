@@ -1,24 +1,21 @@
 #! /bin/sh
 
-firebot () {
-    read cmd args
-    case $cmd in
-        calc)
-            printf "%s = " "$args"
-            echo "$args" | bc -l
-            ;;
-        units)
-            src=$(printf "%s" "$args" | sed 's/ ->.*//')
-            dst=$(printf "%s" "$args" | sed 's/.*-> //')
-            units -1 -v -- "$src" "$dst"
-            ;;
-        *)
-            exit 1
-            ;;
-    esac
-}
-
-echo "$1" | firebot
+cmd=${1%% *}
+[ "$cmd" = "$1" ] || args=${1#* }
+case $cmd in
+    .calc)
+        printf "%s = " "$args"
+        echo "$args" | bc -l
+        ;;
+    .units)
+        src=$(printf "%s" "$args" | sed 's/ ->.*//')
+        dst=$(printf "%s" "$args" | sed 's/.*-> //')
+        units -1 -v -- "$src" "$dst"
+        ;;
+    *)
+        exit 1
+        ;;
+esac
 
 
 
