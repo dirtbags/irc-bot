@@ -36,6 +36,40 @@ Given nickname $nick, creates $nick.fifo, logs into IRC as $nick, and
 passes control to dispatch -> irc -> $nick-handler.
 
 
+cobalt-handler
+--------------
+
+Joins initial channels, responds to invite messages, and tries private
+messages with several different handlers in turn.
+
+
+firebot
+-------
+
+A private message handler providing a few handy commands.
+
+
+infobot
+-------
+
+A private message handler providing infobot-like functionality.
+
+
+notes
+-----
+
+A private message handler allowing users to leave notes for each other.
+
+
+whuffie
+-------
+
+A private message handler keeping track of whuffe (also known as karma),
+which is really just a meaningless number associated with your nick,
+which other people can manipulate but you can't.
+
+
+
 Putting it all together
 =======================
 
