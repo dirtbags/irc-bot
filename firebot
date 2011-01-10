@@ -3,11 +3,11 @@
 cmd=${1%% *}
 [ "$cmd" = "$1" ] || args=${1#* }
 case $cmd in
-    .calc)
+    calc)
         printf "%s = " "$args"
         echo "$args" | bc -l
         ;;
-    .units)
+    units)
         src=$(printf "%s" "$args" | sed 's/ ->.*//')
         dst=$(printf "%s" "$args" | sed 's/.*-> //')
         units -1 -v -- "$src" "$dst"
