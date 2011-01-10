@@ -21,7 +21,9 @@ join () {
 
 case $command in
     001)
-        join "#cobalt"
+        for chan in ${CHANNELS:-#cobalt}; do
+            join $chan
+        done
         ;;
     433)
         raw "NICK bottimus"

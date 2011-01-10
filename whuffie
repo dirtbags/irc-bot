@@ -13,7 +13,7 @@ put () {
 }
 
 adj () {
-    who=${text%%$1$1}
+    who=${text%%$1$1*}
     if [ "$who" = "$sender" ]; then
         echo "Nice try, $sender."
     else
@@ -23,15 +23,15 @@ adj () {
 
 
 case "$text" in
-    whuffie\ *)
-        who=${text##whuffie }
+    .whuffie\ *)
+        who=${text#.whuffie }
         amt=$(get "$who")
-        echo "$who has $amt whuffie"
+        echo "$who has whuffie score of $amt"
         ;;
-    *++)
+    *++|*++\ *)
         adj +
         ;;
-    *--)
+    *--|*--\ *)
         adj -
         ;;
     *)

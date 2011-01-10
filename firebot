@@ -1,5 +1,7 @@
 #! /bin/sh
 
+exec 2>&1
+
 cmd=${1%% *}
 [ "$cmd" = "$1" ] || args=${1#* }
 case $cmd in
@@ -16,3 +18,6 @@ case $cmd in
         exit 1
         ;;
 esac
+
+
+
