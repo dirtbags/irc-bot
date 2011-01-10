@@ -10,8 +10,8 @@ if [ -f $db/$sender ]; then
 fi
 
 case "$text" in 
-    .note\ *)
-        args=${text#.note }
+    note\ *)
+        args=${text#note }
         who=${args%% *}
         what=${args#* }
         when=$(date)
