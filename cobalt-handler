@@ -1,6 +1,6 @@
 #! /bin/sh
 
-pfx=$1;     export pfx;     shift
+prefix=$1;  export prefix;  shift
 command=$1; export command; shift
 sender=$1;  export sender;  shift
 forum=$1;   export forum;   shift
@@ -8,7 +8,7 @@ text=$1;    export text;    shift
 # $* is now args
 
 # Debug output
-echo '>>>' ${pfx:+:}$pfx $command "$@" ${text:+:}"$text" 1>&2
+echo '>>>' ${prefix:+:}$prefix $command "$@" ${text:+:}"$text" 1>&2
 
 raw () {
     fmt="\007$1\n"; shift
