@@ -9,4 +9,6 @@ nickname=$1; export nickname
     echo "USER $1 $1 $1 :I'm a little printf, short and stdout."
 )
 
-exec ./dispatch ./irc ./$1-handler
+mkfifo -m 0600 $1.fifo
+
+exec ./dispatch -f $1.fifo ./irc ./$1-handler

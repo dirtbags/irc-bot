@@ -19,6 +19,8 @@ join () {
     raw "JOIN $1"
 }
 
+out=$(tempfile)
+
 case $command in
     001)
         for chan in ${CHANNELS:-#cobalt}; do
@@ -42,7 +44,14 @@ case $command in
         join "$forum"
         raw "PRIVMSG %s :Thanks for the invitation, %s." "$forum" "$sender"
         ;;
-esac | while read -r line; do
+esac  > $out
+
+if [ "$forum" != "$sender" ] && [ $(wc -l < $out) -gt 5 ]; then
+    printf "PRIVMSG %s :Too many lines, sending privately.\r\n" "$forum"
+    forum=$sender
+fi
+
+while read -r line; do
     case "$line" in
         *)
             printf "%s\r\n" "${line#}"
@@ -51,5 +60,7 @@ esac | while read -r line; do
             printf "PRIVMSG %s :%s\r\n" "$forum" "$line"
             ;;
     esac
-done
+done < $out
+
+rm -f $out
 
