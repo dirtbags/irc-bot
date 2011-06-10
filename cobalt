@@ -1,6 +1,0 @@
-#! /bin/sh
-
-while true; do
-    tcpclient woozle.org 6667 ./bot cobalt
-    sleep 5
-done

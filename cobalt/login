@@ -1,0 +1,4 @@
+#! /bin/sh
+
+echo "NICK cobalt"
+echo "USER cobalt cobalt cobalt :I'm a little printf, short and stdout."

@@ -8,7 +8,7 @@ text=$1;    export text;    shift
 # $* is now args
 
 # Debug output
-echo '>>>' ${prefix:+:}$prefix $command "$@" ${text:+:}"$text" 1>&2
+#echo '>>>' ${prefix:+:}$prefix $command "$@" ${text:+:}"$text" 1>&2
 
 raw () {
     fmt="\007$1\n"; shift
@@ -23,26 +23,27 @@ out=$(tempfile)
 
 case $command in
     001)
-        for chan in ${CHANNELS:-#cobalt}; do
-            join $chan
+        for i in $botdir/channels/*; do
+            join $(basename $i)
         done
         ;;
     433)
-        raw "NICK bottimus"
+        raw "NICK bot_$(shuf -c 1 /usr/share/dict/words)"
         ;;
     PRIVMSG)
         case "$forum" in
             \#*)
-                ./firebot "$text" || \
-                    ./whuffie woozle/whuffie.cdb "$text" || \
-                    ./infobot woozle/factoids.cdb "$text"
-                ./notes woozle/notes "$text"
+                $ircdir/firebot "$text" || \
+                    $ircdir/whuffie $botdir/whuffie.cdb "$text" || \
+                    $ircdir/infobot $botdir/factoids.cdb "$text"
                 ;;
         esac
+        $ircdir/notes $botdir/notes "$text"
         ;;
     INVITE)
         join "$forum"
         raw "PRIVMSG %s :Thanks for the invitation, %s." "$forum" "$sender"
+        touch $botdir/channels/$forum
         ;;
 esac  > $out
 

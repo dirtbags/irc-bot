@@ -29,18 +29,15 @@ specified program with these as arguments.  Also responds to server
 pings as a convenience.
 
 
-bot
+run
 ---
 
-Given nickname $nick, creates $nick.fifo, logs into IRC as $nick, and
-passes control to dispatch -> irc -> $nick-handler.
+[run BOTDIR] will run the bot contained in $BOTDIR.  It should contain
+the following files (see cobalt in the distribution for examples):
 
-
-cobalt-handler
---------------
-
-Joins initial channels, responds to invite messages, and tries private
-messages with several different handlers in turn.
+* connect : program to open connection
+* login   : program to log in to IRC
+* handler : program to handle IRC messages
 
 
 firebot
@@ -75,11 +72,11 @@ Putting it all together
 
 A full chain of programs would look something like
 
-    tcpclient -> bot -> dispatch -> handler
+    tcpclient -> connect-handler -> dispatch -> handler
 
 and would be invoked as
 
-    $ tcpclient irc.host.org 6667 ./bot cobalt
+    $ tcpclient irc.host.org 6667 ./connect-handler cobalt
 
 
 Author

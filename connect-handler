@@ -1,0 +1,20 @@
+#! /bin/sh -e
+
+botdir=$1
+ircdir=$(dirname $0)
+export botdir ircdir
+
+# UCSPI wants communication on fd7
+if [ -n "$PROTO" ]; then
+    fd=7
+else
+    fd=1
+fi
+
+$botdir/login 1>& $fd
+
+if [ -p $botdir/fifo ]; then
+    fifo="-f $botdir/fifo"
+fi
+
+exec $ircdir/dispatch $fifo $ircdir/irc $botdir/handler

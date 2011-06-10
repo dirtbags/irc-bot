@@ -3,6 +3,8 @@
 db=$1; shift
 text="$1"
 
+[ -f $db ] || echo | cdb -c $db
+
 lookup () {
     if ! cdb -q -m $db "$1"; then
         t="$1"
