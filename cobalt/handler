@@ -19,6 +19,21 @@ join () {
     raw "JOIN $1"
 }
 
+cobalt () {
+    case "$1" in
+        air)
+            w3m -dump -cols 9999 'http://environweb.lanl.gov/Teom/teom30s.asp?MasterSiteID=211&offset=0' 2> /dev/null | \
+              awk '/.:..:.. .M/ {print "Los Alamos Air: " $5 "μg/m³ at " $2; exit}'
+	    ;;
+        nachos)
+            echo "aieeeee"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 out=$(tempfile)
 
 case $command in
@@ -33,6 +48,7 @@ case $command in
     PRIVMSG)
         case "$forum" in
             \#*)
+                cobalt "$text" || \
                 $ircdir/firebot "$text" || \
                     $ircdir/whuffie $botdir/whuffie.cdb "$text" || \
                     $ircdir/infobot $botdir/factoids.cdb "$text"
