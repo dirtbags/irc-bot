@@ -3,6 +3,11 @@
 db=$1; shift
 text=$1
 
+lc () {
+    printf "%s" "$1" | tr A-Z a-z
+}
+
+sender=$(lc "$sender")
 if [ -f $db/$sender ]; then
     echo "Welcome back, $sender.  Your messages:"
     cat $db/$sender
@@ -12,7 +17,7 @@ fi
 case "$text" in 
     note\ *)
         args=${text#note }
-        who=${args%% *}
+        who=$(lc "${args%% *}")
         what=${args#* }
         when=$(date)
         
