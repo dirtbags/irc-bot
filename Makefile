@@ -1,5 +1,5 @@
 CFLAGS = -Wall -Werror
-TARGETS = dispatch irc
+TARGETS = dispatch irc-filter
 
 all: $(TARGETS)
 

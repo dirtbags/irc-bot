@@ -92,11 +92,23 @@ main(int argc, char *argv[])
 
   /* Determine forum */
   if ((0 == strcmp(cmd, "PRIVMSG")) ||
-      (0 == strcmp(cmd, "NOTICE")) ||
-      (0 == strcmp(cmd, "PART")) ||
-      (0 == strcmp(cmd, "MODE")) ||
-      (0 == strcmp(cmd, "TOPIC")) ||
-      (0 == strcmp(cmd, "KICK"))) {
+      (0 == strcmp(cmd, "NOTICE"))) {
+    /* :neale!user@127.0.0.1 PRIVMSG #hydra :foo */
+    switch (parts[1][0]) {
+      case '#':
+      case '&':
+      case '+': 
+      case '!':
+        forum = parts[1];
+        break;
+      default:
+        forum = snick;
+        break;
+    }
+  } else if ((0 == strcmp(cmd, "PART")) ||
+             (0 == strcmp(cmd, "MODE")) ||
+             (0 == strcmp(cmd, "TOPIC")) ||
+             (0 == strcmp(cmd, "KICK"))) {
     forum = parts[1];
   } else if (0 == strcmp(cmd, "JOIN")) {
     if (0 == nparts) {
