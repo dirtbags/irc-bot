@@ -103,7 +103,7 @@ main(int argc, char *argv[])
       change_state(INVERSE, 0, 0);
     } else if (31 == c) {
       change_state(UNDERLINE, 0, 0);
-    } else if (15 == c) { /* mIRC reset everything */
+    } else if (15 == c) {
       change_state(RESET, 0, 0);
     } else if ('\n' == c) {
       change_state(RESET, 0, 0);
