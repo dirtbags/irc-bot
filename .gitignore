@@ -1,4 +1,5 @@
 *~
 *.o
 dispatch
-irc
+irc-filter
+irc-esc

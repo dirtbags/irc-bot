@@ -1,0 +1,45 @@
+#! /bin/sh -e
+
+if [ $# -gt 1 ]; then
+  nick=$1
+  shift
+else
+  nick=$LOGNAME
+fi
+export nick
+
+if [ $# -ne 1 ]; then
+  exec 1>&2
+  echo "Usage: $0 BOTDIRECTORY"
+  exit 1
+fi 
+
+server=$1
+ircdir=$(cd $(dirname $0); pwd)
+export server ircdir
+
+if [ -d "$server" ]; then
+  cd $server
+else
+  mkdir -p $HOME/chat/$server
+  cd $HOME/chat/$server
+fi
+srvdir=$(pwd)
+export srvdir
+
+mkdir -p $srvdir
+if [ ! -p $srvdir/fifo ]; then
+  mkfifo $srvdir/fifo
+fi
+ 
+if [ -x $srvdir/connect ]; then
+  connect=$srvdir/connect
+else
+  connect=$ircdir/connect
+fi
+
+
+while true; do
+  $connect $ircdir/connect-handler $srvdir
+  sleep 5
+done

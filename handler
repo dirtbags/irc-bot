@@ -1,0 +1,55 @@
+#! /bin/sh
+
+prefix=$1;  export prefix;  shift
+command=$1; export command; shift
+sender=$1;  export sender;  shift
+forum=$1;   export forum;   shift
+text=$1;    export text;    shift
+# $* is now args
+
+mkdir -p $srvdir/$forum
+
+now=$(date '+%Y-%m-%d %H:%M'); export now
+(
+    flock 3
+    for h in $srvdir/handler $srvdir/$forum/handler; do
+        [ -x $h ] && $h "$@"
+    done
+
+    [ -x $srvdir/$command-hook ] && $srvdir/$command-hook
+
+	case $command in
+        PING)
+            ;;
+        001)
+            for chan in \#* \&* \+*; do
+                if [ -d "$chan" ]; then
+                    echo "JOIN $chan"
+                fi
+            done
+            ;; 
+        433)
+            echo "NICK u$$"
+            ;;
+        PRIVMSG)
+            case "$text" in
+                "ACTION "*)
+                    txt=${text#ACTION }
+                    txt=${txt%}
+                    echo "$now * $sender $txt" 1>&3
+                    ;;
+                *)
+                    txt=${text#}
+                    txt=${txt%}
+                    echo "$now - $sender CTCP $txt" 1>&3
+                    ;;
+                *)
+                    echo "$now <$sender> $text" 1>&3
+                    ;;
+            esac
+            ;;
+        *)
+            echo "$now" ${prefix:+:}$prefix $command "$@" ${text:+:}"$text" 1>&3
+            ;;
+	esac
+) 3>> $srvdir/${forum:-.}/log
