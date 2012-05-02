@@ -115,4 +115,5 @@ main(int argc, char *argv[])
     }
   }
   change_state(RESET, 0, 0);
+  return 0;
 }
