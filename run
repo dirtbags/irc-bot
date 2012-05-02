@@ -11,6 +11,6 @@ if [ ! -d "$botdir" ]; then
 fi
 
 while true; do
-    $botdir/connect $d/connect-handler $botdir
+    $botdir/connect $ircdir/connect-handler $botdir
     sleep 5
 done

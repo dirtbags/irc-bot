@@ -17,4 +17,4 @@ if [ -p $botdir/fifo ]; then
     fifo="-f $botdir/fifo"
 fi
 
-exec $ircdir/dispatch $fifo $ircdir/irc $botdir/handler
+exec $ircdir/dispatch $fifo $ircdir/irc-filter $botdir/handler
