@@ -48,7 +48,7 @@ dispatch(const char *buf,
   char            text[512];
 
   if (buflen > sizeof(text)) {
-    fprintf(stderr, "Ignoring message: too long (%d bytes)\n", buflen);
+    fprintf(stderr, "Ignoring message: too long (%u bytes)\n", (unsigned int)buflen);
     return;
   }
   memcpy(text, buf, buflen-1);  /* omit newline */
@@ -223,8 +223,8 @@ handle_subproc(struct subproc *s)
   /* Recycle this subproc unless something was read */
   if (0 >= len) {
     if (s->buflen) {
-      fprintf(stderr, "warning: discarding %d characters from subprocess buffer\n",
-              s->buflen);
+      fprintf(stderr, "warning: discarding %u characters from subprocess buffer\n",
+              (unsigned int)s->buflen);
     }
     close(s->fd);
     s->fd = 0;
