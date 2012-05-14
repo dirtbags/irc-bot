@@ -1,3 +1,0 @@
-#! /bin/sh
-
-exec socat OPENSSL:127.0.0.1:6697,verify=0,keepalive EXEC:"$*"

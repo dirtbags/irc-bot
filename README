@@ -1,5 +1,5 @@
-bot
-===
+firebot
+=======
 
 This is a suite of simple programs which allow you to write an IRC bot.
 It is based on the Unix principle that one program should do one thing,
@@ -8,6 +8,46 @@ descriptors.
 
 Unless you are a seasoned Unix programmer or are willing to become one,
 this is not the bot you're looking for.
+
+
+
+Getting Started Quickly
+=======================
+
+The `newmont` directory contains a very simple example, which you can
+extend while it's running.  It will connect to an IRC network, join
+the channel `#dumont`, and respond to any channel massage containing
+the substring "strawberry".
+
+You should probably edit newmont/nickname and newmont/server before
+trying this out.  Set it to something hopefully unique on the network
+you intend to join.
+
+Start it like so:
+
+    ./firebot newmont
+
+
+
+What Everything Does
+====================
+
+The core fuctionality exists as two C programs and a couple scripts:
+
+
+firebot
+-------
+
+Reads in nick and realname, sets up a fifo, connects to the server
+(or runs `$botdir/connect`), and hands off to `connect-handler`.
+
+
+connect-handler
+---------------
+
+Sends the `NICK` and `USER` commands to the server (or runs
+`$botdir/login`), then hands off to `dispatch irc-filter
+$botdir/handler`.
 
 
 dispatch
@@ -20,8 +60,8 @@ limited.  A fifo can optionally be specified on the command line;
 anything written to it is treated identically to child output.
 
 
-irc
----
+irc-filter
+----------
 
 Parses its last argument as a line from IRC.  Determines prefix,
 command, sender, forum (channel or user), and text; then invokes a
@@ -29,58 +69,9 @@ specified program with these as arguments.  Also responds to server
 pings as a convenience.
 
 
-run
----
-
-[run BOTDIR] will run the bot contained in $BOTDIR.  It should contain
-the following files (see cobalt in the distribution for examples):
-
-* connect : program to open connection
-* login   : program to log in to IRC
-* handler : program to handle IRC messages
-
-
-firebot
--------
-
-A private message handler providing a few handy commands.
-
-
-infobot
--------
-
-A private message handler providing infobot-like functionality.
-
-
-notes
------
-
-A private message handler allowing users to leave notes for each other.
-
-
-whuffie
--------
-
-A private message handler keeping track of whuffe (also known as karma),
-which is really just a meaningless number associated with your nick,
-which other people can manipulate but you can't.
-
-
-
-Putting it all together
-=======================
-
-A full chain of programs would look something like
-
-    tcpclient -> connect-handler -> dispatch -> handler
-
-and would be invoked as
-
-    $ tcpclient irc.host.org 6667 ./connect-handler cobalt
-
 
 Author
-------
+======
 
 Neale Pickett <neale@woozle.org>
 

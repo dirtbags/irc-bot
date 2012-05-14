@@ -1,9 +1,5 @@
 #! /bin/sh -e
 
-botdir=$1
-ircdir=$(dirname $0)
-export botdir ircdir
-
 # UCSPI wants communication on fd7
 if [ -n "$PROTO" ]; then
     fd=7
@@ -11,10 +7,17 @@ else
     fd=1
 fi
 
-$botdir/login 1>& $fd
-
-if [ -p $botdir/fifo ]; then
-    fifo="-f $botdir/fifo"
+if [ -x $botdir/login ]; then
+    $botdir/login 1>& $fd
+else
+    echo "NICK $nickname" 1>& $fd
+    echo "USER $nickname $nickname $nickname :$realname" 1>& $fd
 fi
 
-exec $ircdir/dispatch $fifo $ircdir/irc-filter $botdir/handler
+if [ -f $botdir/opts ]; then
+    read -r opts < $botdir/opts
+else
+    opts="-i 500000"
+fi
+
+exec $ircdir/dispatch $fifo $opts $ircdir/irc-filter $botdir/handler

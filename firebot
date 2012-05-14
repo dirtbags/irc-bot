@@ -1,23 +1,35 @@
-#! /bin/sh
+#! /bin/sh -e
 
-exec 2>&1
+if ! [ -d $1 ]; then
+    echo "Usage: $0 BOTDIR"
+    echo
+    echo "Starts a new bot with personality defined in BOTDIR."
+    exit 1
+fi
 
-cmd=${1%% *}
-[ "$cmd" = "$1" ] || args=${1#* }
-case $cmd in
-    calc)
-        printf "%s = " "$args"
-        echo "$args" | bc -l
-        ;;
-    units)
-        src=$(printf "%s" "$args" | sed 's/ ->.*//')
-        dst=$(printf "%s" "$args" | sed 's/.*-> //')
-        units -1 -v -- "$src" "$dst"
-        ;;
-    *)
+botdir=$(cd $1; pwd)
+ircdir=$(cd $(dirname $0); pwd)
+export botdir ircdir
+
+nickname=$(cat $botdir/nickname)
+realname=$(cat $botdir/realname 2>/dev/null || \
+    echo "I'm a little printf, short and stdout.")
+export nickname realname
+
+if [ -p $botdir/fifo ]; then
+    mkfifo -m 0600 $botdir/fifo
+    fifo="-f $botdir/fifo"
+    export fifo
+fi
+
+
+if [ -x $botdir/connect ]; then
+    $botdir/connect $ircdir/connect-handler
+else
+    server=$(cat $botdir/server)
+    if [ -z "$server" ]; then
+        echo "$0: no server specified in $botdir/server"
         exit 1
-        ;;
-esac
-
-
-
+    fi
+    socat TCP:$server EXEC:$ircdir/connect-handler
+fi
