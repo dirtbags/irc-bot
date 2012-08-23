@@ -19,6 +19,6 @@ export nickname realname
     fi
 )
 
-mkfifo -m 0600 $botdir/fifo
+[ -p $botdir/fifo ] || mkfifo -m 0600 $botdir/fifo
 
 exec $d/dispatch -f $botdir/fifo $d/irc $botdir/handler

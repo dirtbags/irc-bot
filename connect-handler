@@ -11,7 +11,15 @@ else
     fd=1
 fi
 
-$botdir/login 1>& $fd
+if [ -x $botdir/login ]; then
+    $botdir/login 1 >& $fd
+else
+    nickname=$(cat $botdir/nickname)
+    realname=$(cat $botdir/realname 2>/dev/null || \
+                echo "I'm a little printf, short and stdout.")
+    echo "NICK $nickname" 1 >& $fd
+    echo "USER $nickname $nickname $nickname :$realname" 1 >& $fd
+fi 
 
 if [ -p $botdir/fifo ]; then
     fifo="-f $botdir/fifo"

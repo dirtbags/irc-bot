@@ -111,7 +111,8 @@ main(int argc, char *argv[])
              (0 == strcmp(cmd, "KICK"))) {
     forum = parts[1];
   } else if (0 == strcmp(cmd, "JOIN")) {
-    if (0 == nparts) {
+    DUMP_d(nparts);
+    if (1 == nparts) {
       forum = text;
       text = NULL;
     } else {
