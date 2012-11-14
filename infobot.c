@@ -1,15 +1,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <time.h>
+#include <sysexit.h>
 
-/* Why I am using stdio.h
- * By Neale Pickett
- * November, 2012
- *
- * I am not as clever as the people who maintain libc.
- *
- * THE END
- */
+const char *x_is_y = "It's been said that %s is %s";
+const char *added = "Okay, %s, I added a factoid to %s.";
+const char *removed = "Okay, %s, I removed %d factoids from %s.";
 
 /* Some things I use for debugging */
 #ifdef NODUMP
@@ -26,7 +25,22 @@
 #define DUMP_p(v) DUMPf("%s = %p", #v, v)
 
 
-uint32_t
+/*
+ *
+ * CDB Interface
+ *
+ */
+
+/* Why I am using stdio.h
+ * By Neale Pickett
+ * November, 2012
+ *
+ * I am not as clever as the people who maintain libc.
+ *
+ * THE END
+ */
+
+static uint32_t
 hash(char *s, size_t len)
 {
     uint32_t h = 5381;
@@ -38,13 +52,6 @@ hash(char *s, size_t len)
     return h;
 }
 
-int
-usage()
-{
-    fprintf(stderr, "Usage: infobot\n");
-
-    return 0;
-}
 
 uint32_t
 read_u32(FILE *f)
@@ -130,13 +137,93 @@ lookup(FILE *f, char *key)
 }
 
 
+int
+usage()
+{
+    fprintf(stderr, "Usage: infobot factoids.cdb \"text\"\n");
+
+    return 0;
+}
+
+size_t
+lowercase(char *text)
+{
+    size_t ret;
+
+    for (ret = 0; text[ret]; ret += 1) {
+        text[ret] = tolower(text[ret]);
+    }
+
+    return ret;
+}
+
+int
+infocmd(char *filename, char *text)
+{
+    return 0;
+}
+
+int 
+lookup(char *filename, char *text)
+{
+    struct cdb c;
+    FILE *f = fopen(filename, "r");
+    size_t textlen = lowercase(text);
+    uint32_t nresults;
+
+    if (! f) {
+        perror("Opening database");
+        return EX_NOINPUT;
+    }
+
+    cdb_init(&c, f);
+
+    /* Count how many results there are */
+    cdb_lookup(&c, text, textlen);
+    for (results = 0; cdb_next(&c, NULL, 0); results += 1);
+
+    if (nresults > 0) {
+        /* This is horrible: say rand() returned between 0 and 2, and results
+         * was 2.  Possible values would be (0, 1, 0): not a uniform
+         * distribution.  But this is random enough for our purposes. */
+        uint32_t which = rand() % results;
+        char val[8192];
+
+        cdb_lookup(&c, text, textlen);
+        for (results = 0; results < which; results += 1) {
+            cdb_next(&c, NULL, 0);
+        }
+        cdb_next(&c, val, sizeof val);
+
+        if (val[0] == '"') {
+            printf("%s\n", val + 1);
+        } else if (val[0] == ':') {
+            printf("\001ACTION %s\001\n", val + 1);
+        } else {
+            printf(x_is_y, text, val);
+        }
+    }
+
+    return 0;
+}
 
 int
 main(int argc, char *argv[])
 {
-    if (1 == argc) {
+    char *filename;
+    char *text;
+
+    if (3 != argc) {
         return usage();
     }
 
-    return lookup(stdin, argv[1]);
+    srand((unsigned int)time(NULL));
+
+    filename = argv[1];
+    text = argv[2];
+
+    if ('!' == text[0]) {
+        return infocmd(filename, text + 1);
+    }
+    return lookup(filename, text);
 }
