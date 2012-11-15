@@ -13,7 +13,8 @@
 #include <sys/time.h>
 #include <dirent.h>
 #include <fcntl.h>
-#include "dispatch.h"
+
+#include "dump.h"
 
 #define MAX_ARGS 50
 #define MAX_SUBPROCS 50
@@ -318,12 +319,13 @@ handle_file(FILE *f, void (*func) (const char *, size_t))
 
     // Read a line.  If we didn't have enough space, pretend it was a line
     // anyway.
-    fgets(line, sizeof line, f);
-    linelen = strlen(line);
-    if (line[linelen-1] != '\n') {
-        line[linelen++] = '\n';
+    while (fgets(line, sizeof line, f)) {
+        linelen = strlen(line);
+        if (line[linelen-1] != '\n') {
+            line[linelen++] = '\n';
+        }
+        func(line, linelen);
     }
-    func(line, linelen);
 }
 
 void
@@ -384,12 +386,10 @@ loop()
                 snprintf(fn, sizeof fn, "%s/%s", msgdir, ent->d_name);
                 f = fopen(fn, "r");
                 if (f) {
-                    while (! feof(f)) {
-                        handle_file(f, output);
-                    }
+                    handle_file(f, output);
                     fclose(f);
+                    remove(fn);
                 }
-                remove(fn);
             }
         }
 
@@ -408,7 +408,9 @@ loop()
     }
 
     do {
-        ret = select(nfds + 1, &rfds, NULL, NULL, NULL);
+        struct timeval timeout = {1, 0};
+
+        ret = select(nfds + 1, &rfds, NULL, NULL, msgdir?(&timeout):NULL);
     } while ((-1 == ret) && (EINTR == errno));
     if (-1 == ret) {
         perror("select");
