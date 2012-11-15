@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include "dispatch.h"
 
@@ -310,6 +311,22 @@ handle_input()
 }
 
 void
+handle_file(FILE *f, void (*func) (const char *, size_t))
+{
+    char line[2048];
+    size_t linelen;
+
+    // Read a line.  If we didn't have enough space, pretend it was a line
+    // anyway.
+    fgets(line, sizeof line, f);
+    linelen = strlen(line);
+    if (line[linelen-1] != '\n') {
+        line[linelen++] = '\n';
+    }
+    func(line, linelen);
+}
+
+void
 handle_subproc(struct subproc *s)
 {
     ssize_t len;
@@ -350,6 +367,36 @@ loop()
     int ret;
     int nfds = 0;
     fd_set rfds;
+
+    if (msgdir) {
+        DIR *d = opendir(msgdir);
+
+        while (d) {
+            struct dirent *ent = readdir(d);
+
+            if (! ent) {
+                break;
+            }
+            if (ent->d_type == DT_REG) {
+                char fn[PATH_MAX];
+                FILE *f;
+
+                snprintf(fn, sizeof fn, "%s/%s", msgdir, ent->d_name);
+                f = fopen(fn, "r");
+                if (f) {
+                    while (! feof(f)) {
+                        handle_file(f, output);
+                    }
+                    fclose(f);
+                }
+                remove(fn);
+            }
+        }
+
+        if (d) {
+            closedir(d);
+        }
+    }
 
     FD_ZERO(&rfds);
     FD_SET(0, &rfds);
