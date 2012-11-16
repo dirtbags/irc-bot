@@ -1,0 +1,70 @@
+#! /usr/bin/lua
+
+--
+-- Set global variables from environment
+--
+prefix = os.getenv("prefix")
+forum = os.getenv("forum")
+sender = os.getenv("sender")
+command = os.getenv("command")
+text = os.getenv("text")
+
+--
+-- Write text to stderr (for debugging)
+--
+function log(text)
+    io.stderr:write(text .. "\n")
+end
+
+--
+-- Send a raw IRC command to the server
+--
+function raw(text)
+    log("<   " .. text)
+    print(text)
+end
+
+
+--
+-- Send a message to the forum; if we've sent 4 lines
+-- already, start sending directly to the sender, to
+-- avoid spamming channels.
+--
+msgs_sent = 0
+msg_recip = forum
+
+function msg(text)
+    msgs_sent = msgs_sent + 1
+    if ((msgs_sent == 5) and (forum ~= sender)) then
+        raw("PRIVMSG " .. forum .. " :Sending the rest in private")
+        msg_recip = sender
+    end
+    raw("PRIVMSG " .. msg_recip .. " :" .. text)
+end
+
+--
+--
+-- Main program
+--
+--
+
+-- Log what we got
+log("  > " .. (prefix or "") .. " " .. (sender or "-") .. "/" .. (forum or "-") .. " [" .. command .. "] :" .. (text or ""))
+
+-- Our action depends on what the command is
+if (command == "INIT") then
+    -- bot sends this when it first starts up, so we can log in
+    raw("NICK nemont")
+    raw("USER newmont newmont newmont :Sample bot")
+elseif (command == "433") then
+    -- Couldn't get the nickname we asked for
+    raw("NICK bot_" .. (os.time() % 500))
+elseif (command == "001") then
+    -- IRC server sends this after successful login
+    raw("JOIN #newmont")
+elseif (command == "PRIVMSG") then
+    -- Somebody said something!
+    if (text:find("strawberry")) then
+        msg("Strawberries are delicious.")
+    end
+end
