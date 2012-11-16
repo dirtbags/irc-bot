@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <ctype.h>
 #include <time.h>
 #include <errno.h>
@@ -18,7 +19,6 @@
 
 #define MAX_ARGS 50
 #define MAX_SUBPROCS 50
-#define TARGET_MAX 20
 
 #define max(a,b) ((a)>(b)?(a):(b))
 
@@ -35,8 +35,10 @@ maybe_setenv(char *key, char *val)
 }
 
 void
-irc_filter(char *line)
+irc_filter(const char *str)
 {
+    char buf[4096];
+    char *line = buf;
     char *parts[20] = {0};
     int   nparts;
     char  snick[20];
@@ -47,6 +49,7 @@ irc_filter(char *line)
     char *forum = NULL;
     int   i;
 
+    strncpy(buf, str, sizeof buf);
     /* Tokenize IRC line */
     nparts = 0;
     if (':' == *line) {
@@ -152,42 +155,50 @@ irc_filter(char *line)
     }
 }
 
-struct subproc {
-    int fd;                     /* File descriptor */
-    char buf[4000];             /* Read buffer */
-    size_t buflen;              /* Buffer length */
-};
+void
+unblock(int fd)
+{
+    int flags = fcntl(fd, F_GETFL, 0);
 
-struct subproc subprocs[MAX_SUBPROCS] = { {0} };
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
+
+FILE *subprocs[MAX_SUBPROCS] = { 0 };
 
 void
-dispatch(const char *buf, size_t buflen)
+sigchld(int signum)
+{
+    while (0 < waitpid(-1, NULL, WNOHANG));
+}
+
+
+void
+dispatch(char *text)
 {
     int subout[2];
-    struct subproc *s = NULL;
     int i;
-    char text[512];
-
-    if (buflen > sizeof(text)) {
-        fprintf(stderr, "Ignoring message: too long (%u bytes)\n", (unsigned int) buflen);
-        return;
-    }
-    memcpy(text, buf, buflen - 1);      /* omit newline */
-    text[buflen - 1] = '\0';
 
     for (i = 0; i < MAX_SUBPROCS; i += 1) {
-        if (0 == subprocs[i].fd) {
-            s = &subprocs[i];
+        if (NULL == subprocs[i]) {
             break;
         }
     }
-    if (!s) {
-        fprintf(stderr, "Ignoring message: too many subprocesses\n");
+
+    if (MAX_SUBPROCS == i) {
+        fprintf(stderr, "warning: dropping message (too many children)\n");
         return;
     }
 
     if (-1 == pipe(subout)) {
         perror("pipe");
+        return;
+    }
+
+    subprocs[i] = fdopen(subout[0], "r");
+    if (! subprocs[i]) {
+        close(subout[0]);
+        close(subout[1]);
+        perror("fdopen");
         return;
     }
 
@@ -208,11 +219,10 @@ dispatch(const char *buf, size_t buflen)
          * We'll be a good citizen and only close file descriptors we opened. 
          */
         close(null);
-        close(subout[0]);
         close(subout[1]);
         for (i = 0; i < MAX_SUBPROCS; i += 1) {
-            if (subprocs[i].fd) {
-                close(subprocs[i].fd);
+            if (subprocs[i]) {
+                fclose(subprocs[i]);
             }
         }
 
@@ -220,7 +230,7 @@ dispatch(const char *buf, size_t buflen)
         exit(0);
     }
 
-    s->fd = subout[0];
+    unblock(subout[0]);
     close(subout[1]);
 }
 
@@ -254,112 +264,43 @@ delay_output()
 
 /** Writes all of buf to stdout, possibly blocking. */
 void
-output(const char *buf, size_t count)
+output(char *buf)
 {
     if (timerisset(&output_interval)) {
         delay_output();
     }
 
-    while (count) {
-        ssize_t len;
-
-        do {
-            len = write(1, buf, count);
-        } while ((-1 == len) && (EINTR == errno));
-        if (-1 == len) {
-            perror("stdout");
-            exit(EX_IOERR);
-        }
-        count -= len;
-        buf += len;
-    }
+    puts(buf);
 }
 
 void
-call_with_lines(char *buf, size_t * len, void (*func) (const char *, size_t))
-{
-    char *b = buf;
-    char *p;
-    size_t l = *len;
-
-    while ((p = memchr(b, '\n', l))) {
-        size_t n = p - b + 1;
-
-        func(b, n);
-        l -= n;
-        b += n;
-    }
-    memmove(buf, b, l);
-    *len = l;
-}
-
-char inbuf[8000];
-size_t inbuflen = 0;
-
-void
-handle_input()
-{
-    ssize_t len;
-
-    do {
-        len = read(0, inbuf + inbuflen, sizeof(inbuf) - inbuflen);
-    } while ((-1 == len) && (EINTR == errno));
-    if (0 == len) {
-        exit(0);
-    }
-    inbuflen += len;
-    call_with_lines(inbuf, &inbuflen, dispatch);
-}
-
-void
-handle_file(FILE *f, void (*func) (const char *, size_t))
+handle_file(FILE *f, void (*func) (char *))
 {
     char line[2048];
     size_t linelen;
 
-    // Read a line.  If we didn't have enough space, pretend it was a line
-    // anyway.
+    // Read a line.  If we didn't have enough space, drop it.
     while (fgets(line, sizeof line, f)) {
         linelen = strlen(line);
         if (line[linelen-1] != '\n') {
-            line[linelen++] = '\n';
+            fprintf(stderr, "warning: dropping %d bytes (no trailing newline)\n", linelen);
+        } else {
+            line[linelen-1] = '\0';
+            func(line);
         }
-        func(line, linelen);
     }
 }
 
 void
-handle_subproc(struct subproc *s)
+handle_input()
 {
-    ssize_t len;
+    handle_file(stdin, dispatch);
+}
 
-    do {
-        len = read(s->fd, s->buf + s->buflen, sizeof(s->buf) - s->buflen);
-    } while ((-1 == len) && (EINTR == errno));
-
-    if (-1 == len) {
-        perror("subprocess read error");
-    } else {
-        s->buflen += len;
-        call_with_lines(s->buf, &s->buflen, output);
-    }
-
-    if (sizeof(s->buf) == s->buflen) {
-        fprintf(stderr, "subprocess buffer full, killing and discarding buffer.\n");
-        len = 0;
-    }
-
-    /*
-     * Recycle this subproc unless something was read 
-     */
-    if (0 >= len) {
-        if (s->buflen) {
-            fprintf(stderr, "warning: discarding %u characters from subprocess buffer\n", (unsigned int) s->buflen);
-        }
-        close(s->fd);
-        s->fd = 0;
-        s->buflen = 0;
-    }
+void
+handle_subproc(FILE *s)
+{
+    handle_file(s, output);
 }
 
 void
@@ -369,7 +310,10 @@ loop()
     int ret;
     int nfds = 0;
     fd_set rfds;
+    static time_t last_pulse = 0;
+    time_t now;
 
+    // Look for messages in msgdir
     if (msgdir) {
         DIR *d = opendir(msgdir);
 
@@ -386,7 +330,8 @@ loop()
                 snprintf(fn, sizeof fn, "%s/%s", msgdir, ent->d_name);
                 f = fopen(fn, "r");
                 if (f) {
-                    handle_file(f, output);
+                    // This one is blocking
+                    handle_subproc(f);
                     fclose(f);
                     remove(fn);
                 }
@@ -398,42 +343,53 @@ loop()
         }
     }
 
+    // Check subprocs for input
     FD_ZERO(&rfds);
     FD_SET(0, &rfds);
     for (i = 0; i < MAX_SUBPROCS; i += 1) {
-        if (subprocs[i].fd) {
-            FD_SET(subprocs[i].fd, &rfds);
-            nfds = max(nfds, subprocs[i].fd);
+        if (subprocs[i]) {
+            int fd = fileno(subprocs[i]);
+
+            FD_SET(fd, &rfds);
+            nfds = max(nfds, fd);
         }
     }
 
     do {
         struct timeval timeout = {1, 0};
 
-        ret = select(nfds + 1, &rfds, NULL, NULL, msgdir?(&timeout):NULL);
+        ret = select(nfds + 1, &rfds, NULL, NULL, &timeout);
     } while ((-1 == ret) && (EINTR == errno));
     if (-1 == ret) {
         perror("select");
         exit(EX_IOERR);
     }
 
+
     if (FD_ISSET(0, &rfds)) {
         handle_input();
     }
 
     for (i = 0; i < MAX_SUBPROCS; i += 1) {
-        if (subprocs[i].fd && FD_ISSET(subprocs[i].fd, &rfds)) {
-            handle_subproc(&subprocs[i]);
+        FILE *f = subprocs[i];
+
+        if (f && FD_ISSET(fileno(f), &rfds)) {
+            handle_subproc(f);
+            if (feof(f)) {
+                fclose(f);
+                subprocs[i] = NULL;
+            }
         }
+    }
+
+    // Heartbeat
+    now = time(NULL);
+    if (now - last_pulse > 5) {
+        last_pulse = now;
+        dispatch("PULSE");
     }
 }
 
-
-void
-sigchld(int signum)
-{
-    while (0 < waitpid(-1, NULL, WNOHANG));
-}
 
 void
 usage(char *self)
@@ -500,7 +456,13 @@ main(int argc, char *argv[])
         close(7);
     }
 
+    unblock(0);
+    setvbuf(stdout, NULL, _IOLBF, 0);
+
     signal(SIGCHLD, sigchld);
+
+    // Let handler know we're starting up
+    dispatch("INIT");
 
     while (1) {
         loop();
