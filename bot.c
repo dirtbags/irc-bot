@@ -284,7 +284,7 @@ handle_file(FILE *f, void (*func) (char *))
     while (fgets(line, sizeof line, f)) {
         linelen = strlen(line);
         if (line[linelen-1] != '\n') {
-            fprintf(stderr, "warning: dropping %d bytes (no trailing newline)\n", linelen);
+            fprintf(stderr, "warning: dropping %u bytes (no trailing newline)\n", (unsigned int)linelen);
         } else {
             line[linelen-1] = '\0';
             func(line);
