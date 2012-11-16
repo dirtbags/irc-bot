@@ -22,6 +22,7 @@
 
 #define max(a,b) ((a)>(b)?(a):(b))
 
+bool running = true;
 char *handler = NULL;
 char *msgdir = NULL;
 struct timeval output_interval = {0};
@@ -295,6 +296,9 @@ void
 handle_input()
 {
     handle_file(stdin, dispatch);
+    if (feof(stdin)) {
+        running = false;
+    }
 }
 
 void
@@ -462,11 +466,14 @@ main(int argc, char *argv[])
     signal(SIGCHLD, sigchld);
 
     // Let handler know we're starting up
-    dispatch("INIT");
+    dispatch("_INIT_");
 
-    while (1) {
+    while (running) {
         loop();
     }
+
+    // Let handler know we're shutting down
+    dispatch("_END_");
 
     return 0;
 }
