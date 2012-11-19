@@ -1,72 +1,101 @@
-firebot
-=======
+bot
+===
 
-This is a suite of simple programs which allow you to write an IRC bot.
-It is based on the Unix principle that one program should do one thing,
-and makes extensive use of pipes, child processes, and passing of file
-descriptors.
-
-Unless you are a seasoned Unix programmer or are willing to become one,
-this is not the bot you're looking for.
-
+This is a simple C program to assist writing an IRC bot in whatever
+language(s) you choose.  It is based on the Unix principle that one
+program should do one thing.
 
 
 Getting Started Quickly
 =======================
 
-The `newmont` directory contains a very simple example, which you can
-extend while it's running.  It will connect to an IRC network, join
-the channel `#dumont`, and respond to any channel massage containing
-the substring "strawberry".
-
-You should probably edit newmont/nickname and newmont/server before
-trying this out.  Set it to something hopefully unique on the network
-you intend to join.
+The example handler script, called `newmont`, will get you started right
+away.  It will set its nickname to `newmont`, join the channel
+`#newmont`, and respond to any channel message containing the substring
+"strawberry".
 
 Start it like so:
 
-    ./firebot newmont
+    tcpclient YOUR.IRC.SERVER 6667 ./bot contrib/newmont
 
 
+What's Going On
+===============
 
-What Everything Does
-====================
-
-The core fuctionality exists as two C programs and a couple scripts:
+There are three pieces involved.
 
 
-firebot
+tcpclient
+---------
+
+`tcpclient' is a program that connects to a TCP port, sets file
+descriptors 6 and 7 to be the input and output channels to that
+connection, and hands off control to whatever program you specify (in
+the example above, the `./bot` program with argument `./newmont`).
+There also exist a `udpclient`, `sslclient`, and probably others.  The
+advantage to this method is that your network client doesn't have to
+care about the transport mechanism: TCP, UDP, TCP6, SSL, or whatever
+else.
+
+
+bot
+---
+
+`bot` reads one line at a time from fd6 (or 0 as a fallback), parses it
+up, forks, sets some environment variables, and runs the "handler"
+program provided as the first argument.  Whatever that program prints to
+stdout is sent back to the server, verbatim.  As a convenience, it
+automatically responds to PING messages from the server.  It can also
+rate-limit messages to the server, so your bot doesn't flood itself off
+IRC.  Lastly, it can monitor a directory and send the contents of any
+new file to the server, deleting the file after.  This allows you to
+write to IRC from a cron job, git post-update hook, or whatever else you
+dream up.
+
+`bot` sets the following environment variables:
+
+    prefix      you probably don't care about this
+    command     IRC command or numeric
+    sender      nickname to send "private" replies to this message
+    forum       nickname to send "public" replies to this message
+    text        command text, like what's sent to the channel
+
+Any additional parameters of the message, like with the MODE command,
+are passed in as arguments to the handler.
+
+
+handler
 -------
 
-Reads in nick and realname, sets up a fifo, connects to the server
-(or runs `$botdir/connect`), and hands off to `connect-handler`.
+The handler is launched once for each incoming message.  It should
+decide what to do based on the environment variables and argv, possibly
+writing something to stdout, and then it should exit.
+
+Handlers are launched in parallel to each other.  IRC is an asynchronous
+protocol, and while messages do tend to arrive in a particular order,
+    don't count on it, especially with this framework.
+
+`newmont` is a very simple handler script to reply to any PRIVMSG with
+the substring "strawberry", in the (public) forum it was sent.
 
 
-connect-handler
----------------
+Caution
+=======
 
-Sends the `NICK` and `USER` commands to the server (or runs
-`$botdir/login`), then hands off to `dispatch irc-filter
-$botdir/handler`.
+Your handler is getting input provided by a potentially malicious
+adversary.  If you're not careful, you could create a remote exploit: a
+path through your handler script that allows anyone on IRC to do
+whatever they want on your local computer.
 
+You can write handlers in bourne shell: it's really easy.  It's equally
+as easy to accidentally allow remote control.  There's nothing I can do
+in my code I provide to prevent you from creating a remote exploit, all
+I can do is warn you.
 
-dispatch
---------
-
-Reads lines from stdin (or fd 6).  Each line causes a fork and exec of a
-specified program; the line is sent as the last argument.  Any output
-from children is passed through to stdout (or fd 7), optionally rate
-limited.  A fifo can optionally be specified on the command line;
-anything written to it is treated identically to child output.
-
-
-irc-filter
-----------
-
-Parses its last argument as a line from IRC.  Determines prefix,
-command, sender, forum (channel or user), and text; then invokes a
-specified program with these as arguments.  Also responds to server
-pings as a convenience.
+If you're not confident in your mastery of bourne shell quoting rules,
+you should build off of the provided lua example, which will make it
+much more difficult to accidentally create an exploit.  Or create a new
+handler in Python, Ruby, etc.
 
 
 
@@ -74,6 +103,4 @@ Author
 ======
 
 Neale Pickett <neale@woozle.org>
-
-
 
