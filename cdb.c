@@ -3,25 +3,26 @@
 #include <stdint.h>
 #include "cdb.h"
 
-/* Some things I use for debugging */
-#ifdef NODUMP
-#  define DUMPf(fmt, args...)
-#else
-#  define DUMPf(fmt, args...) fprintf(stderr, "%s:%s:%d " fmt "\n", __FILE__, __FUNCTION__, __LINE__, ##args)
-#endif
-#define DUMP() DUMPf("")
-#define DUMP_u(v) DUMPf("%s = %u", #v, v)
-#define DUMP_d(v) DUMPf("%s = %d", #v, v)
-#define DUMP_x(v) DUMPf("%s = 0x%x", #v, v)
-#define DUMP_s(v) DUMPf("%s = %s", #v, v)
-#define DUMP_c(v) DUMPf("%s = %c", #v, v)
-#define DUMP_p(v) DUMPf("%s = %p", #v, v)
+/*
+ *
+ * CDB Interface
+ *
+ */
+
+/* Why I am using stdio.h
+ * By Neale Pickett
+ * November, 2012
+ *
+ * I am not as clever as the people who maintain libc.
+ *
+ * THE END
+ */
 
 #ifndef min
 #define min(a,b) ((a)<(b)?(a):(b))
 #endif
 
-uint32_t
+static uint32_t
 hash(char *s, size_t len)
 {
     uint32_t h = 5381;
@@ -33,16 +34,8 @@ hash(char *s, size_t len)
     return h;
 }
 
-int
-usage()
-{
-    fprintf(stderr, "Usage: infobot\n");
-
-    return 0;
-}
-
-uint32_t
-read_u32(FILE *f)
+static uint32_t
+read_u32le(FILE *f)
 {
     uint8_t d[4];
 
@@ -51,17 +44,6 @@ read_u32(FILE *f)
             (d[1] << 8) |
             (d[2] << 16) |
             (d[3] << 24));
-}
-
-
-int
-bufcmp(char *a, size_t alen, char *b, size_t blen)
-{
-    if (alen == blen) {
-        return memcmp(a, b, blen);
-    } else {
-        return alen - blen;
-    }
 }
 
 void
@@ -81,8 +63,8 @@ cdb_find(struct cdb_ctx *ctx, char *key, uint32_t keylen)
 
     /* Read pointer */
     fseek(ctx->f, (ctx->hash_val % 256) * 8, SEEK_SET);
-    ctx->hash_pos = read_u32(ctx->f);
-    ctx->hash_len = read_u32(ctx->f);
+    ctx->hash_pos = read_u32le(ctx->f);
+    ctx->hash_len = read_u32le(ctx->f);
     ctx->entry = (ctx->hash_val / 256) % ctx->hash_len;
 }
 
@@ -95,9 +77,11 @@ cdb_next(struct cdb_ctx *ctx, char *buf, uint32_t buflen)
     uint32_t dlen;
 
     for (;;) {
-        fseek(ctx->f, ctx->hash_pos + (ctx->entry++ * 8), SEEK_SET);
-        hashval = read_u32(ctx->f);
-        entry_pos = read_u32(ctx->f);
+        fseek(ctx->f, ctx->hash_pos + (ctx->entry * 8), SEEK_SET);
+        ctx->entry = (ctx->entry + 1) % ctx->hash_len;
+
+        hashval = read_u32le(ctx->f);
+        entry_pos = read_u32le(ctx->f);
         if (entry_pos == 0) {
             break;
         }
@@ -106,8 +90,8 @@ cdb_next(struct cdb_ctx *ctx, char *buf, uint32_t buflen)
         }
 
         fseek(ctx->f, entry_pos, SEEK_SET);
-        klen = read_u32(ctx->f);
-        dlen = read_u32(ctx->f);
+        klen = read_u32le(ctx->f);
+        dlen = read_u32le(ctx->f);
 
         if (klen == ctx->keylen) {
             uint32_t i;
@@ -124,32 +108,14 @@ cdb_next(struct cdb_ctx *ctx, char *buf, uint32_t buflen)
                 continue;
             }
 
-            return fread(buf, 1, min(dlen, buflen), ctx->f);
+            if (buf) {
+                return fread(buf, 1, min(dlen, buflen), ctx->f);
+            } else {
+                return dlen;
+            }
         }
     }
 
     return 0;
 }
 
-
-int
-main(int argc, char *argv[])
-{
-    if (1 == argc) {
-        return usage();
-    }
-
-    {
-        struct cdb_ctx ctx;
-        char buf[8192];
-        int32_t r;
-
-        cdb_init(&ctx, stdin);
-        cdb_find(&ctx, argv[1], strlen(argv[1]));
-        while ((r = cdb_next(&ctx, buf, sizeof buf))) {
-            printf("%.*s\n", r, buf);
-        }
-    }
-
-    return 0;
-}
