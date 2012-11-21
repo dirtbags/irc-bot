@@ -40,8 +40,10 @@ read_u32le(FILE *f)
 {
     uint8_t d[4];
 
-    fread(d, 4, 1, f);
-    return ((d[0]<< 0) |
+    if (0 == fread(d, 4, 1, f)) {
+        return 0;
+    }
+    return ((d[0] << 0) |
             (d[1] << 8) |
             (d[2] << 16) |
             (d[3] << 24));
@@ -80,24 +82,26 @@ cdb_dump(struct cdb_ctx *ctx,
         // Find out where to stop reading
         int i;
 
+        fseek(ctx->f, 0, SEEK_SET);
         ctx->hash_len = 0;
         ctx->hash_pos = 0xffffffff;
         for (i = 0; i < 256; i += 1) {
             uint32_t p;
 
-            fseek(ctx->f, i * 8, SEEK_SET);
             p = read_u32le(ctx->f);
+            read_u32le(ctx->f);
             if (p < ctx->hash_pos) {
                 ctx->hash_pos = p;
             }
         }
-        fseek(ctx->f, 256 * 8, SEEK_SET);
-    } else {
-        long where = ftell(ctx->f);
 
-        if (where >= ctx->hash_pos) {
-            return EOF;
-        }
+        ctx->entry = 256 * 8;
+        fseek(ctx->f, ctx->entry, SEEK_SET);
+    } 
+    
+    // Stop if we've reached the end
+    if (ctx->entry >= ctx->hash_pos) {
+        return EOF;
     }
 
     // Read the two buffers
@@ -107,6 +111,8 @@ cdb_dump(struct cdb_ctx *ctx,
 
        *keylen = read_buf(ctx->f, klen, key, *keylen);
        *vallen = read_buf(ctx->f, vlen, val, *vallen);
+
+        ctx->entry += 4 + 4 + klen + vlen;
     }
 
     return 0;

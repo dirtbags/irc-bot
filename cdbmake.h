@@ -15,6 +15,7 @@ struct cdbmake_ctx {
     FILE *f;
     struct cdbmake_record *records[256];
     uint32_t nrecords[256];
+    long where;
 };
 
 void cdbmake_init(struct cdbmake_ctx *ctx, FILE *f);

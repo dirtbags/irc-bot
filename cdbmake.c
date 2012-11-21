@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>     // XXX: remove if malloc() is gone
 #include "cdbmake.h"
+#include "dump.h"
 
 static uint32_t
 hash(char *s, size_t len)
@@ -36,7 +37,8 @@ cdbmake_init(struct cdbmake_ctx *ctx, FILE *f)
         ctx->nrecords[i] = 0;
     }
     
-    fseek(f, 256 * 8, SEEK_SET);
+    ctx->where = 256 * 8;
+    fseek(f, ctx->where, SEEK_SET);
 }
 
 void
@@ -44,7 +46,6 @@ cdbmake_add(struct cdbmake_ctx *ctx,
         char *key, size_t keylen,
         char *val, size_t vallen)
 {
-    long where = ftell(ctx->f);
     uint32_t hashval = hash(key, keylen);
     int idx = hashval % 256;
     uint32_t n = ctx->nrecords[idx];
@@ -57,13 +58,15 @@ cdbmake_add(struct cdbmake_ctx *ctx,
         return;
     }
     ctx->records[idx][n].hashval = hashval;
-    ctx->records[idx][n].offset = (uint32_t)where;
+    ctx->records[idx][n].offset = (uint32_t)ctx->where;
 
     // Write it out
     write_u32le(ctx->f, keylen);
     write_u32le(ctx->f, vallen);
     fwrite(key, 1, keylen, ctx->f);
     fwrite(val, 1, vallen, ctx->f);
+
+    ctx->where += 4 + 4 + keylen + vallen;
 }
 
 void
