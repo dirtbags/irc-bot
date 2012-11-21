@@ -15,8 +15,6 @@
 #include <dirent.h>
 #include <fcntl.h>
 
-#include "dump.h"
-
 #define MAX_ARGS 50
 #define MAX_SUBPROCS 50
 

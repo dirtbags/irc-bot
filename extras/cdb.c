@@ -2,7 +2,6 @@
 #include <string.h>
 #include <stdint.h>
 #include "cdb.h"
-#include "dump.h"
 
 /*
  *

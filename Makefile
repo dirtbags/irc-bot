@@ -1,11 +1,11 @@
 CFLAGS = -Wall -Werror
 TARGETS = bot
-TARGETS += infobot
+TARGETS += extras/factoids
 
 all: $(TARGETS)
 
-infobot: infobot.o cdb.o cdbmake.o
+extras/factoids: extras/factoids.o extras/cdb.o extras/cdbmake.o
 
 .PHONY: clean
 clean:
-	rm -f $(TARGETS) *.o
+	rm -f $(TARGETS) *.o extras/*.o

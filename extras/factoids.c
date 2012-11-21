@@ -9,12 +9,19 @@
 #include <sysexits.h>
 #include "cdb.h"
 #include "cdbmake.h"
-#include "dump.h"
 
 int
-usage()
+usage(char *self)
 {
-    fprintf(stderr, "Usage: infobot factoids.cdb \"text\"\n");
+    fprintf(stderr, "Usage: %s [OPTIONS] CDB \"KEY\"\n", self);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Default:   Display one randomly-picked entry for KEY\n");
+    fprintf(stderr, "-n         Create database from scratch, ignoring KEY\n");
+    fprintf(stderr, "-l         Display all entries for KEY\n");
+    fprintf(stderr, "-a VAL     Append VAL to entries for KEY\n");
+    fprintf(stderr, "-r GLOB    Remove entries matching GLOB from KEY\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "KEY is always converted to lowercase (Latin-1 only)\n");
 
     return EX_USAGE;
 }
@@ -215,12 +222,29 @@ del(char *filename, char *key, char *glob)
     return 0;
 }
 
+int
+create(char *filename)
+{
+    FILE *f = fopen(filename, "wb");
+    struct cdbmake_ctx outc;
+
+    if (! f) {
+        perror("Creating database");
+        return EX_CANTCREAT;
+    }
+
+    cdbmake_init(&outc, f);
+    cdbmake_finalize(&outc);
+
+    return 0;
+}
 
 enum action {
     ACT_ONE,
     ACT_ALL,
     ACT_ADD,
-    ACT_DEL
+    ACT_DEL,
+    ACT_NEW
 };
 
 int
@@ -232,7 +256,7 @@ main(int argc, char *argv[])
     enum action act = ACT_ONE;
 
     for (;;) {
-        int opt = getopt(argc, argv, "la:r:");
+        int opt = getopt(argc, argv, "hlna:r:");
 
         if (-1 == opt) {
             break;
@@ -240,6 +264,9 @@ main(int argc, char *argv[])
         switch (opt) {
             case 'l':
                 act = ACT_ALL;
+                break;
+            case 'n':
+                act = ACT_NEW;
                 break;
             case 'a':
                 act = ACT_ADD;
@@ -253,8 +280,16 @@ main(int argc, char *argv[])
                 return usage(argv[0]);
         }
     }
-    if (argc - optind != 2) {
-        return usage(argv[0]);
+
+    if (! (filename = argv[optind++])) {
+        usage(argv[0]);
+    }
+    if ((act != ACT_NEW) &&
+            (! (key = argv[optind++]))) {
+        usage(argv[0]);
+    }
+    if (argv[optind]) {
+        usage(argv[0]);
     }
 
     // Seed PRNG with some crap
@@ -265,9 +300,6 @@ main(int argc, char *argv[])
         srand((unsigned int)(tv.tv_sec * tv.tv_usec));
     }
 
-    filename = argv[optind];
-    key = argv[optind + 1];
-
     switch (act) {
         case ACT_ONE:
             return choose(filename, key);
@@ -277,6 +309,8 @@ main(int argc, char *argv[])
             return add(filename, key, val);
         case ACT_DEL:
             return del(filename, key, val);
+        case ACT_NEW:
+            return create(filename);
     }
 
     return 0;

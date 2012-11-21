@@ -3,7 +3,6 @@
 #include <string.h>
 #include <stdlib.h>     // XXX: remove if malloc() is gone
 #include "cdbmake.h"
-#include "dump.h"
 
 static uint32_t
 hash(char *s, size_t len)
