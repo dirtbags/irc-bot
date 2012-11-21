@@ -108,7 +108,6 @@ cdbmake_finalize(struct cdbmake_ctx *ctx)
         free(buf);
     }
 
-    fclose(ctx->f);
     ctx->f = NULL;
     
     for (idx = 0; idx < 256; idx += 1) {

@@ -6,6 +6,7 @@
 #include <string.h>
 
 struct cdbmake_record {
+    FILE *f;
     uint32_t hashval;
     uint32_t offset;
 };

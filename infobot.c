@@ -122,19 +122,18 @@ add(char *filename, char *key, char *val)
     struct cdbmake_ctx outc;
     FILE *inf;
     FILE *outf;
+    char tmpfn[8192];
 
+    // Open input file
     inf = fopen(filename, "rb");
     if (! inf) {
         perror("Opening database");
         return EX_NOINPUT;
     }
 
-    {
-        char fn[4096];
-
-        snprintf(fn, sizeof(fn), "%s.%d", filename, getpid());
-        outf = fopen(fn, "wb");
-    }
+    // Create temporary output file
+    snprintf(tmpfn, sizeof(tmpfn), "%s.%d", filename, getpid());
+    outf = fopen(tmpfn, "wb");
     if (! outf) {
         perror("Creating temporary database");
         return EX_CANTCREAT;
@@ -156,6 +155,10 @@ add(char *filename, char *key, char *val)
     }
     cdbmake_add(&outc, key, strlen(key), val, strlen(val));
     cdbmake_finalize(&outc);
+
+    fclose(outf);
+    fclose(inf);
+    rename(tmpfn, filename);
 
     return 0;
 }
