@@ -18,7 +18,10 @@ struct cdb_ctx {
 };
 
 void cdb_init(struct cdb_ctx *ctx, FILE *f);
-void cdb_find(struct cdb_ctx *ctx, char *key, uint32_t keylen);
-uint32_t cdb_next(struct cdb_ctx *ctx, char *buf, uint32_t buflen);
+int cdb_dump(struct cdb_ctx *ctx,
+        char *key, size_t *keylen,
+        char *val, size_t *vallen);
+void cdb_find(struct cdb_ctx *ctx, char *key, size_t keylen);
+uint32_t cdb_next(struct cdb_ctx *ctx, char *buf, size_t buflen);
 
 #endif

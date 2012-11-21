@@ -4,7 +4,7 @@ TARGETS += infobot
 
 all: $(TARGETS)
 
-infobot: infobot.o cdb.o
+infobot: infobot.o cdb.o cdbmake.o
 
 .PHONY: clean
 clean:

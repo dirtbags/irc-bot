@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdint.h>
 #include "cdb.h"
+#include "dump.h"
 
 /*
  *
@@ -46,22 +47,80 @@ read_u32le(FILE *f)
             (d[3] << 24));
 }
 
+static uint32_t
+read_buf(FILE *f, uint32_t fieldlen, char *buf, size_t buflen)
+{
+
+    uint32_t size = min(buflen, fieldlen);
+    size_t r = fread(buf, 1, (size_t)size, f);
+
+    // Slurp up the rest
+    for (fieldlen -= r; fieldlen > 0; fieldlen -= 1) {
+        getc(f);
+    }
+
+    return size;
+}
+
 void
 cdb_init(struct cdb_ctx *ctx, FILE *f)
 {
     ctx->f = f;
     ctx->key = NULL;
+    ctx->hash_len = 1;
+}
+
+int
+cdb_dump(struct cdb_ctx *ctx,
+        char *key, size_t *keylen,
+        char *val, size_t *vallen)
+{
+    // Set hash_len to 0 to signal we're in position
+    if (ctx->hash_len != 0) {
+        // Find out where to stop reading
+        int i;
+
+        ctx->hash_len = 0;
+        ctx->hash_pos = 0xffffffff;
+        for (i = 0; i < 256; i += 1) {
+            uint32_t p;
+
+            fseek(ctx->f, i * 8, SEEK_SET);
+            p = read_u32le(ctx->f);
+            if (p < ctx->hash_pos) {
+                ctx->hash_pos = p;
+            }
+        }
+        fseek(ctx->f, 256 * 8, SEEK_SET);
+    } else {
+        long where = ftell(ctx->f);
+
+        if (where >= ctx->hash_pos) {
+            return EOF;
+        }
+    }
+
+    // Read the two buffers
+    {
+       uint32_t klen = read_u32le(ctx->f);
+       uint32_t vlen = read_u32le(ctx->f);
+
+       *keylen = read_buf(ctx->f, klen, key, *keylen);
+       *vallen = read_buf(ctx->f, vlen, val, *vallen);
+    }
+
+    return 0;
 }
 
 void
-cdb_find(struct cdb_ctx *ctx, char *key, uint32_t keylen)
+cdb_find(struct cdb_ctx *ctx, char *key, size_t keylen)
 {
-    ctx->hash_val = hash(key, keylen);
-
     ctx->key = key;
     ctx->keylen = keylen;
 
-    /* Read pointer */
+    ctx->hash_val = hash(key, keylen);
+
+    // Read pointer
     fseek(ctx->f, (ctx->hash_val % 256) * 8, SEEK_SET);
     ctx->hash_pos = read_u32le(ctx->f);
     ctx->hash_len = read_u32le(ctx->f);
@@ -69,7 +128,7 @@ cdb_find(struct cdb_ctx *ctx, char *key, uint32_t keylen)
 }
 
 uint32_t
-cdb_next(struct cdb_ctx *ctx, char *buf, uint32_t buflen)
+cdb_next(struct cdb_ctx *ctx, char *buf, size_t buflen)
 {
     uint32_t hashval;
     uint32_t entry_pos;
@@ -109,7 +168,7 @@ cdb_next(struct cdb_ctx *ctx, char *buf, uint32_t buflen)
             }
 
             if (buf) {
-                return fread(buf, 1, min(dlen, buflen), ctx->f);
+                return read_buf(ctx->f, dlen, buf, buflen);
             } else {
                 return dlen;
             }
