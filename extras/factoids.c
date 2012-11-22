@@ -282,14 +282,14 @@ main(int argc, char *argv[])
     }
 
     if (! (filename = argv[optind++])) {
-        usage(argv[0]);
+        return usage(argv[0]);
     }
     if ((act != ACT_NEW) &&
             (! (key = argv[optind++]))) {
-        usage(argv[0]);
+        return usage(argv[0]);
     }
     if (argv[optind]) {
-        usage(argv[0]);
+        return usage(argv[0]);
     }
 
     // Seed PRNG with some crap
