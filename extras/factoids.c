@@ -213,6 +213,7 @@ del(char *filename, char *key, char *glob)
                 (0 == memcmp(k, key, klen)) &&
                 (0 == fnmatch(glob, v, 0))) {
             // Skip if it matches
+            printf("-%.*s\n", vlen, v);
         } else {
             cdbmake_add(&outc, k, klen, v, vlen);
         }
