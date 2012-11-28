@@ -84,6 +84,16 @@ want, and you don't even need to restart anything to apply your changes,
 since a new handler is launched for each message.
 
 
+factoids
+========
+
+A program to maintain a low-overhead, read-optimized database file, which
+can store multiple values for each key.  This was written to help develop
+infobots, but can also be used for any other key/value store needed.
+
+The `infobot.py` program in `contrib/` has a simple infobot implementation.
+
+
 Caution
 =======
 
@@ -101,26 +111,6 @@ If you're not confident in your mastery of bourne shell quoting rules,
 you should build off of the provided lua example, which will make it
 much more difficult to accidentally create an exploit.  Or create a new
 handler in Python, Ruby, etc.
-
-
-Extras
-======
-
-Included AT NO ADDITIONAL COST, in the `extras/` directory, are:
-
-
-newmont
--------
-
-A simple handler, written in lua.
-
-
-factoids
---------
-
-A program to maintain a low-overhead, read-optimized database file, which
-can store multiple values for each key.  This was written to help develop
-infobots, but can also be used for any other key/value store needed.
 
 
 Author

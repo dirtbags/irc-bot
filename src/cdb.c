@@ -129,7 +129,10 @@ cdb_find(struct cdb_ctx *ctx, char *key, size_t keylen)
     fseek(ctx->f, (ctx->hash_val % 256) * 8, SEEK_SET);
     ctx->hash_pos = read_u32le(ctx->f);
     ctx->hash_len = read_u32le(ctx->f);
-    ctx->entry = (ctx->hash_val / 256) % ctx->hash_len;
+
+    if (ctx->hash_len > 0) {
+        ctx->entry = (ctx->hash_val / 256) % ctx->hash_len;
+    }
 }
 
 uint32_t
@@ -140,7 +143,7 @@ cdb_next(struct cdb_ctx *ctx, char *buf, size_t buflen)
     uint32_t klen;
     uint32_t dlen;
 
-    for (;;) {
+    for (; ctx->hash_len > 0;) {
         fseek(ctx->f, ctx->hash_pos + (ctx->entry * 8), SEEK_SET);
         ctx->entry = (ctx->entry + 1) % ctx->hash_len;
 

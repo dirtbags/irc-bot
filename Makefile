@@ -1,11 +1,14 @@
 CFLAGS = -Wall -Werror
-TARGETS = bot
-TARGETS += extras/factoids
+TARGETS = bot factoids
 
 all: $(TARGETS)
 
-extras/factoids: extras/factoids.o extras/cdb.o extras/cdbmake.o
+%: src/%
+	cp $< $@
+
+src/bot:
+src/factoids: src/factoids.o src/cdb.o src/cdbmake.o
 
 .PHONY: clean
 clean:
-	rm -f $(TARGETS) *.o extras/*.o
+	rm -f $(TARGETS) $(addprefix src/, $(TARGETS)) src/*.o

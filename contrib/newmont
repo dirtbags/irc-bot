@@ -2,12 +2,12 @@
 
 --
 -- A very simple bot which will join IRC, join #newmont, and 
--- respond to any messages with "strawberry" in them.  It also
--- has some naïve nickname collision avoidance.
+-- talk about strawberries.  It also has some naïve nickname
+-- collision avoidance.
 --
 -- This is a good place to start if you're not going to write
 -- your handler in lua.  If you *do* want to use lua, you should
--- take a look at bot.lua instead.
+-- think about how to make a better design :)
 --
 
 prefix = os.getenv("prefix")
@@ -21,17 +21,23 @@ io.stderr:write(">>> [" .. command .. "] " ..
         (forum or "-") .. " " .. 
         (text or "") .. "\n")
 
+--
 -- Our behavior depends on what the command is
+--
+
 if (command == "_INIT_") then
     -- bot sends this when it first starts up, so we can log in
     print("NICK nemont")
     print("USER newmont newmont newmont :Sample bot")
+ 
 elseif (command == "433") then
     -- Couldn't get the nickname we asked for
     print("NICK bot_" .. (os.time() % 500))
+ 
 elseif (command == "001") then
     -- IRC server sends this after successful login
     print("JOIN #newmont")
+
 elseif (command == "PRIVMSG") then
     -- Somebody said something!
     if (text:find("strawberry")) then
