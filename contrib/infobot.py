@@ -3,6 +3,10 @@
 ##
 ## Example of an infobot, using the provided helper.
 ##
+##     tcpclient moo.slashnet.org 6667 ./bot contrib/infobot.py
+## or
+##     socat TCP:moo.slashnet.org:6667 EXEC:"./bot contrib/infobot.py"
+##
 
 import sys
 import os
