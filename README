@@ -37,6 +37,9 @@ advantage to this method is that your network client doesn't have to
 care about the transport mechanism: TCP, UDP, TCP6, SSL, or whatever
 else.
 
+Other programs which work this way include `socat` and BSD `netcat`.
+Use whatever you prefer.
+
 
 bot
 ---
