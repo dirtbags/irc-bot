@@ -1,5 +1,5 @@
 CFLAGS = -Wall -Werror
-TARGETS = bot factoids
+TARGETS = bot factoids slack.cgi
 
 all: $(TARGETS)
 
@@ -8,6 +8,8 @@ all: $(TARGETS)
 
 src/bot:
 src/factoids: src/factoids.o src/cdb.o src/cdbmake.o
+
+src/slack.cgi: src/slack.cgi.o src/cgi.o
 
 .PHONY: clean
 clean:
