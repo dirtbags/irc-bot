@@ -6,6 +6,8 @@
 
 #include "cgi.h"
 
+char const *botdir = "/home/neale/bot/zinc";
+
 void
 jputchar(char c)
 {
@@ -54,7 +56,9 @@ main(int argc, char *argv[])
 			setenv("sender", val, true);
 		} else if (0 == strcmp(key, "text")) {
 			setenv("text", val, true);
-		} 
+		} else if (0 == strcmp(key, "token")) {
+			setenv("token", val, true);
+		}
 	}
 	
 	cgi_header("text/json");
@@ -66,7 +70,7 @@ main(int argc, char *argv[])
 	
 	setenv("command", "PRIVMSG", true);
 	
-	chdir("/home/neale/bot/zinc");
+	chdir(botdir);
 	{
 		FILE *p = popen("./handler", "r");
 		int newlines = 0;
